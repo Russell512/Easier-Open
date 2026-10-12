@@ -1,0 +1,4 @@
+Noto Sans TC Regular (static TrueType)
+Source: https://fontsource.org/fonts/noto-sans-tc
+License: SIL Open Font License 1.1
+Used only for Traditional Chinese PDF export.

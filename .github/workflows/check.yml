@@ -1,0 +1,15 @@
+name: Check Easier
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint && npm run typecheck && npm run test:tabs && npm run test:notes && npm run test:documents && npm run test:autosync && npm run test:demo && npm run build:local

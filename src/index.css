@@ -1,0 +1,18 @@
+@import "tailwindcss";
+
+:root {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { margin: 0; min-width: 320px; background: #16181d; color: #e4e7ee; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+button, input, select, textarea { font: inherit; }
+.text-balance { text-wrap: balance; }
+.animate-slide-in { animation: slide-in 160ms ease-out; }
+@keyframes slide-in { from { opacity: 0; transform: translateX(12px); } to { opacity: 1; transform: translateX(0); } }
+@media (prefers-reduced-motion: reduce) { .animate-slide-in { animation: none; } }
