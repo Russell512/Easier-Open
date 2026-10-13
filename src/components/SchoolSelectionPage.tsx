@@ -150,10 +150,9 @@ export function SchoolSelectionPage({
     <section data-testid="selection-page">
       <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
         <div>
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Two independent views</p>
           <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">選校排序</h1>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-stone-500">
-            將「你有多想去」與「申請有多競爭」分開判斷；本頁不建立或顯示混合總分。
+            想去程度與申請競爭度分開排序。
           </p>
         </div>
         <button

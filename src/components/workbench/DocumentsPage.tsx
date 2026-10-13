@@ -28,7 +28,7 @@ export function DocumentsPage({ library, programs, programId }: { library: Docum
   }
 
   return <section className="wb-documents">
-    <PageHeading eyebrow={programId ? 'SCHOOL DOCUMENTS' : 'DOCUMENT LIBRARY'} title={programId ? '這所學校的文件' : '我的文件庫'} description={programId ? '各校版本與所有學校共用的文件，集中在這裡。' : '從第一份草稿到最後定稿，讓每一份申請資料都有位置。'} actions={<><button className="wb-button" disabled={busy || library.loading} onClick={() => void act(() => exportDocuments(library.documents), '文件庫備份已匯出，包含檔案、連結與封存項目。')}><ArrowDownToLine size={15} />備份</button><button className="wb-button primary" onClick={() => setAdding(true)} disabled={library.loading || !!library.error}><Plus size={16} />加入文件</button></>} />
+    <PageHeading title={programId ? '學程文件' : '我的文件'} actions={<><button className="wb-button" disabled={busy || library.loading} onClick={() => void act(() => exportDocuments(library.documents), '文件庫備份已匯出，包含檔案、連結與封存項目。')}><ArrowDownToLine size={15} />備份</button><button className="wb-button primary" onClick={() => setAdding(true)} disabled={library.loading || !!library.error}><Plus size={16} />加入文件</button></>} />
     <div className="wb-document-types" aria-label="文件分類">
       {(['all', ...DOCUMENT_CATEGORIES] as const).map((type) => <button key={type} aria-pressed={category === type} onClick={() => setCategory(type)}><FileText size={18} /><span>{type === 'all' ? '全部文件' : type}</span><strong>{inScope.filter((doc) => !doc.archived && (type === 'all' || doc.category === type)).length}</strong></button>)}
     </div>
@@ -54,9 +54,9 @@ export function DocumentsPage({ library, programs, programId }: { library: Docum
           <button disabled={busy} className="wb-icon-button" aria-label={`${doc.archived ? '還原' : '封存'} ${doc.name}`} title={doc.archived ? '還原文件' : '封存（可還原）'} onClick={() => void act(() => library.save([{ ...doc, archived: !doc.archived }]), doc.archived ? '文件已還原。' : '文件已封存，可在「已封存」找回。')}>{doc.archived ? <RotateCcw size={16} /> : <Archive size={16} />}</button></div>
           {editingId === doc.id && <DocumentMetadata key={doc.id} document={doc} programs={programs} onCancel={() => setEditingId(null)} onSave={(item) => void act(async () => { await library.save([item]); setEditingId(null) }, '文件資訊已儲存。')} />}
         </article>
-      })}</div> : <div className="wb-empty"><FolderOpen size={34} /><h3>{query || category !== 'all' ? '沒有符合條件的文件' : archived ? '沒有封存的文件' : '把申請資料整理在一起'}</h3><p>可加入 PDF、Word、圖片或文件連結，分別保存 CV、SOP、LoR 與其他資料。</p>{!archived && <button className="wb-button primary" onClick={() => setAdding(true)}><Plus size={15} />加入第一份文件</button>}</div>}
+      })}</div> : <div className="wb-empty"><FolderOpen size={34} /><h3>{query || category !== 'all' ? '沒有符合條件的文件' : archived ? '沒有封存的文件' : '尚無文件'}</h3><p>支援 PDF、Word、圖片與文件連結。</p>{!archived && <button className="wb-button primary" onClick={() => setAdding(true)}><Plus size={15} />加入第一份文件</button>}</div>}
     </div>
-    <p className="wb-footnote"><span className="wb-dot" />檔案先保存在此瀏覽器，雲端模式會自動上傳私人文件空間；請確認上方顯示「已同步」。上方「完整備份」可一次保存學校資料、筆記、SOP 素材與文件。</p>
+    <p className="wb-footnote"><span className="wb-dot" />「完整備份」包含學程資料、筆記、SOP 素材與文件。</p>
     <input hidden ref={importInput} type="file" accept=".json" aria-label="選擇文件庫備份" onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ''; if (file) void act(async () => { await importDocuments(file); await library.refresh() }, '備份已加入文件庫，原有文件仍保留。') }} />
   </section>
 }

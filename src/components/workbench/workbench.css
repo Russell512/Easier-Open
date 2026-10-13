@@ -308,7 +308,6 @@ input[type=checkbox] { accent-color: var(--wb-accent); width: 15px; height: 15px
 .wb-result-overlay { box-shadow: 0 15px 45px #0008; border-color: var(--wb-blue); cursor: grabbing; }
 .wb-result-overlay span { display: block; font-size: 10px; color: var(--wb-muted); }
 .wb-result-overlay strong { font-size: 13px; }
-.wb-result-announcement { min-height: 20px; font-size: 12px; color: #91c7ad; }
 .wb-related-programs { margin: 16px 0; padding: 14px; background: var(--wb-panel); border: 1px solid var(--wb-border); border-radius: 6px; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
 .wb-related-programs label { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; min-width: 0; font-size: 12px; }
 .wb-related-programs select { max-width: 100%; }
@@ -351,7 +350,6 @@ input[type=checkbox] { accent-color: var(--wb-accent); width: 15px; height: 15px
 .wb-result-card > p { margin: 4px 0; }
 .wb-result-card .wb-result-select { padding: 3px 0; }
 .wb-result-empty { grid-column: 1 / -1; padding: 12px; }
-.wb-result-announcement:empty { min-height: 0; }
 .wb-results-archive { margin-top: 24px; border-top: 1px solid var(--wb-border); }
 .wb-archive-toggle { display: flex; align-items: center; gap: 10px; width: 100%; padding: 15px 4px; color: var(--wb-muted); text-align: left; border-bottom: 1px solid var(--wb-border); }
 .wb-archive-toggle small { margin-left: auto; }.wb-archive-toggle span { font-size: 11px; }
@@ -433,4 +431,3 @@ input[type=checkbox] { accent-color: var(--wb-accent); width: 15px; height: 15px
 .wb-shortlist-export .wb-button { border-color: #476183; background: #26364d; color: #c6dcff; }
 .wb-shortlist-export .wb-button:hover { border-color: #749acb; background: #304565; }
 .wb-shortlist-export .wb-button > span { border-left: 1px solid #789bc944; padding-left: 9px; margin-left: 3px; font-variant-numeric: tabular-nums; }
-.wb-shortlist-export small { font-size: 10px; color: var(--wb-muted); }

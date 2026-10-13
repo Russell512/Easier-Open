@@ -70,7 +70,7 @@ export function NoteEditor({ notes, noteId }: { notes: ApplicationNotesControlle
                 <textarea
                   value={selected.body}
                   onChange={(event) => notes.updateNote(selected.id, { body: event.target.value })}
-                  placeholder="開始寫下你看到的資訊、比較結果或想法…"
+                  placeholder="寫下筆記…"
                   aria-label="Note 內容"
                   className="min-h-72 w-full resize-y border-0 bg-transparent text-sm leading-7 text-stone-800 outline-none placeholder:text-stone-300 sm:text-[15px]"
                   data-testid="note-body-editor"
@@ -80,7 +80,6 @@ export function NoteEditor({ notes, noteId }: { notes: ApplicationNotesControlle
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <h2 className="flex items-center gap-2 text-sm font-bold text-stone-800"><ListChecks className="h-4 w-4 text-emerald-700" />Checklist</h2>
-                      <p className="mt-1 text-[11px] text-stone-400">加入可直接打勾的行動項目。</p>
                     </div>
                     <button
                       onClick={() => notes.addChecklistItem(selected.id)}
@@ -146,5 +145,5 @@ export function NotesList({ notes, onOpen, compact = false }: { notes: Applicati
   </section>
 }
 export function NotesPage({ notes, onOpen }: { notes: ApplicationNotesController; onOpen: (id: string) => void }) {
-  return <section><h1 className="wb-notes-title">我的 Notes</h1><p className="wb-muted">選擇筆記，在右側編輯。可和學程一起並排查看，內容自動儲存。</p><NotesList notes={notes} onOpen={onOpen} /></section>
+  return <section><h1 className="wb-notes-title">我的 Notes</h1><NotesList notes={notes} onOpen={onOpen} /></section>
 }

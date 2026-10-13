@@ -241,11 +241,7 @@ export function SopMaterialBankPage({ programs }: { programs: ProgramView[] }) {
     <section data-testid="sop-material-bank-page">
       <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
         <div className="max-w-3xl">
-          <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">Guided evidence collection</p>
-          <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">SOP Material Bank</h1>
-          <p className="mt-2 text-sm leading-6 text-stone-500">
-            先把真實經歷拆成可用素材，再決定如何組成 SOP。本頁不會自動生成、補寫或假設你的經歷。
-          </p>
+          <h1 className="mt-1 text-2xl font-bold tracking-tight sm:text-3xl">SOP 素材</h1>
         </div>
         <div className="flex flex-wrap gap-2">
           <button

@@ -22,11 +22,10 @@ export function OverviewPage({ programs, model, selection, library, onOpen, onNa
     { label: '我的申請文件', value: files.length, unit: '份', detail: `${files.filter((doc) => doc.stage === '定稿').length} 份定稿 · 含檔案與連結`, icon: Files, tab: 'documents' as const, tone: 'purple' },
   ]
   return <section>
-    <PageHeading eyebrow="YOUR APPLICATION, ORGANIZED" title="讓下一步，更清楚。" description="學程、進度與申請文件，都在你的工作台。" actions={<><span className="wb-today">{new Intl.DateTimeFormat('zh-TW', { month: 'long', day: 'numeric', weekday: 'short' }).format(now)}</span><button className="wb-button primary" onClick={() => onNavigate('programs')}>瀏覽學程<ArrowRight size={15} /></button></>} />
+    <PageHeading title="工作台" actions={<><span className="wb-today">{new Intl.DateTimeFormat('zh-TW', { month: 'long', day: 'numeric', weekday: 'short' }).format(now)}</span><button className="wb-button primary" onClick={() => onNavigate('programs')}>瀏覽學程<ArrowRight size={15} /></button></>} />
     <div className="wb-metrics">{metrics.map(({ label, value, unit, detail, icon: Icon, tab, tone }) => <button className={`wb-metric ${tone}`} onClick={() => onNavigate(tab)} key={label}><span className="wb-metric-label">{label}<Icon size={17} /></span><strong>{value}<small>{unit}</small></strong><span>{detail}<ArrowUpRight size={13} /></span></button>)}</div>
     <div className="wb-overview-grid">
       <Panel title="繼續你的申請" icon={<GraduationCap size={17} />} action={<button className="wb-text-button" onClick={() => onNavigate('programs')}>全部學程<ArrowRight size={13} /></button>}>
-        <p className="wb-panel-caption">依你的選校排序，快速回到重點學程</p>
         <div className="wb-resume-list">{ranked.map((program) => <button key={program.id} onClick={() => onOpen(program.id)}><SchoolIcon program={program} /><span className="wb-resume-school"><strong>{program.programName}</strong><small>{program.university}</small><span className="wb-progress-line"><span style={{ width: `${program.completion}%` }} /></span></span><span className="wb-resume-status"><span className={`wb-badge status-${program.status.toLowerCase()}`}>{statusLabel(program.status)}</span><small>{program.completion}% 完成</small></span><Chevron /></button>)}{!ranked.length && <p className="wb-empty">目前沒有追蹤中的學程。</p>}</div>
         <button className="wb-panel-bottom" onClick={() => onNavigate('compare')}><span>還在選擇？把學程放在一起比較</span><ArrowRight size={15} /></button>
       </Panel>

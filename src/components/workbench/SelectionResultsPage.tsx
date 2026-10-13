@@ -31,7 +31,7 @@ function ResultColumn({ category, programs, selection, onAssign, onOpen }: { cat
   </section>
 }
 
-export function SelectionResultsPage({ programs, selection, model, onAssign, onOpen }: { model: WorkbookModel; programs: ProgramView[]; selection: SchoolSelectionState; onAssign: Assign; onOpen: (id: string) => void }) {
+export function SelectionResultsPage({ programs, selection, model, onAssign, onOpen, onNotify }: { model: WorkbookModel; programs: ProgramView[]; selection: SchoolSelectionState; onAssign: Assign; onOpen: (id: string) => void; onNotify: (message: string) => void }) {
   const [query, setQuery] = useState('')
   const shortlistCount = shortlistPrograms(programs, selection).length
   const [expanded, setExpanded] = useState<SelectionResult | null>(null)
@@ -47,10 +47,9 @@ export function SelectionResultsPage({ programs, selection, model, onAssign, onO
     setAnnouncement(`${program?.university} ${program?.programName} 已移到${category}`)
   }
   return <section>
-    <PageHeading eyebrow="APPLICATION SHORTLIST" title="選校結果" description="專注在準備申請的學程。四個主要分類向下排列，拖曳把手或使用選單調整分類。" actions={<div className="wb-shortlist-export"><button className="wb-button" disabled={!shortlistCount} onClick={() => { downloadShortlistCsv(model, programs, selection); setAnnouncement(`已匯出 ${shortlistCount} 個學程，僅包含彩票、衝刺、主申、較為保險。`) }}><Download size={15} />匯出選校 CSV<span>{shortlistCount}</span></button><small>四類全部匯出，不受搜尋影響</small></div>} />
+    <PageHeading title="選校結果" actions={<div className="wb-shortlist-export"><button className="wb-button" disabled={!shortlistCount} title="匯出彩票、衝刺、主申、較為保險的全部學程，不受搜尋影響" onClick={() => { downloadShortlistCsv(model, programs, selection); onNotify(`已匯出 ${shortlistCount} 個學程`) }}><Download size={15} />匯出選校 CSV<span>{shortlistCount}</span></button></div>} />
     <div className="wb-toolbar"><label className="wb-search"><Search size={16} /><input aria-label="搜尋選校結果" placeholder="搜尋學校或學程…" value={query} onChange={(event) => setQuery(event.target.value)} /></label><span className="wb-muted">{visible.filter(p => SHORTLIST_RESULTS.includes(selectionResult(selection.results?.[p.id]))).length} 個主要候選 · {query ? `搜尋符合 ${visible.length} 個` : `共 ${programs.length} 個學程`}</span></div>
-    <p className="wb-input-hint">淘汰與未分類收在下方；需要回顧時再展開。所有變更自動儲存。</p>
-    <p className="wb-result-announcement" role="status">{announcement}</p>
+    <p className="sr-only" role="status">{announcement}</p>
     <DndContext sensors={sensors} onDragStart={({ active }) => setActiveId(String(active.id))} onDragCancel={() => setActiveId(null)} onDragEnd={({ active, over }) => {
       setActiveId(null)
       const category = SELECTION_RESULTS.find((c) => `result:${c}` === over?.id)
