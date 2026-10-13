@@ -1,10 +1,11 @@
 import { programSearchText } from '../../lib/workbook'
 import { useState } from 'react'
 import { DndContext, DragOverlay, PointerSensor, useDraggable, useDroppable, useSensor, useSensors } from '@dnd-kit/core'
-import { GripVertical, Search, ArrowUpRight, ChevronRight } from 'lucide-react'
-import type { ProgramView, SchoolSelectionState, SelectionResult } from '../../types'
+import { GripVertical, Search, ArrowUpRight, ChevronRight, Download } from 'lucide-react'
+import type { ProgramView, SchoolSelectionState, SelectionResult, WorkbookModel } from '../../types'
 import { SELECTION_RESULTS, selectionResult } from '../../lib/selection'
 import { PageHeading } from './shared'
+import { SHORTLIST_RESULTS, shortlistPrograms, downloadShortlistCsv } from '../../lib/shortlistExport'
 import { fieldText } from './helpers'
 
 type Assign = (id: string, result: SelectionResult) => void
@@ -30,8 +31,9 @@ function ResultColumn({ category, programs, selection, onAssign, onOpen }: { cat
   </section>
 }
 
-export function SelectionResultsPage({ programs, selection, onAssign, onOpen }: { programs: ProgramView[]; selection: SchoolSelectionState; onAssign: Assign; onOpen: (id: string) => void }) {
+export function SelectionResultsPage({ programs, selection, model, onAssign, onOpen }: { model: WorkbookModel; programs: ProgramView[]; selection: SchoolSelectionState; onAssign: Assign; onOpen: (id: string) => void }) {
   const [query, setQuery] = useState('')
+  const shortlistCount = shortlistPrograms(programs, selection).length
   const [expanded, setExpanded] = useState<SelectionResult | null>(null)
   const [activeId, setActiveId] = useState<string | null>(null)
   const [announcement, setAnnouncement] = useState('')
@@ -45,8 +47,8 @@ export function SelectionResultsPage({ programs, selection, onAssign, onOpen }: 
     setAnnouncement(`${program?.university} ${program?.programName} 已移到${category}`)
   }
   return <section>
-    <PageHeading eyebrow="APPLICATION SHORTLIST" title="選校結果" description="專注在準備申請的學程。四個主要分類向下排列，拖曳把手或使用選單調整分類。" />
-    <div className="wb-toolbar"><label className="wb-search"><Search size={16} /><input aria-label="搜尋選校結果" placeholder="搜尋學校或學程…" value={query} onChange={(event) => setQuery(event.target.value)} /></label><span className="wb-muted">{visible.filter(p => ['彩票', '衝刺', '主申', '較為保險'].includes(selectionResult(selection.results?.[p.id]))).length} 個主要候選 · {query ? `搜尋符合 ${visible.length} 個` : `共 ${programs.length} 個學程`}</span></div>
+    <PageHeading eyebrow="APPLICATION SHORTLIST" title="選校結果" description="專注在準備申請的學程。四個主要分類向下排列，拖曳把手或使用選單調整分類。" actions={<div className="wb-shortlist-export"><button className="wb-button" disabled={!shortlistCount} onClick={() => { downloadShortlistCsv(model, programs, selection); setAnnouncement(`已匯出 ${shortlistCount} 個學程，僅包含彩票、衝刺、主申、較為保險。`) }}><Download size={15} />匯出選校 CSV<span>{shortlistCount}</span></button><small>四類全部匯出，不受搜尋影響</small></div>} />
+    <div className="wb-toolbar"><label className="wb-search"><Search size={16} /><input aria-label="搜尋選校結果" placeholder="搜尋學校或學程…" value={query} onChange={(event) => setQuery(event.target.value)} /></label><span className="wb-muted">{visible.filter(p => SHORTLIST_RESULTS.includes(selectionResult(selection.results?.[p.id]))).length} 個主要候選 · {query ? `搜尋符合 ${visible.length} 個` : `共 ${programs.length} 個學程`}</span></div>
     <p className="wb-input-hint">淘汰與未分類收在下方；需要回顧時再展開。所有變更自動儲存。</p>
     <p className="wb-result-announcement" role="status">{announcement}</p>
     <DndContext sensors={sensors} onDragStart={({ active }) => setActiveId(String(active.id))} onDragCancel={() => setActiveId(null)} onDragEnd={({ active, over }) => {
@@ -54,7 +56,7 @@ export function SelectionResultsPage({ programs, selection, onAssign, onOpen }: 
       const category = SELECTION_RESULTS.find((c) => `result:${c}` === over?.id)
       if (category) assign(String(active.id), category)
     }}>
-      <div className="wb-results-board">{(['彩票', '衝刺', '主申', '較為保險'] as SelectionResult[]).map((category) => <ResultColumn key={category} category={category} programs={visible.filter((p) => selectionResult(selection.results?.[p.id]) === category)} selection={selection} onAssign={assign} onOpen={onOpen} />)}</div>
+      <div className="wb-results-board">{SHORTLIST_RESULTS.map((category) => <ResultColumn key={category} category={category} programs={visible.filter((p) => selectionResult(selection.results?.[p.id]) === category)} selection={selection} onAssign={assign} onOpen={onOpen} />)}</div>
       <div className="wb-results-archive">{(['未分類', '淘汰'] as SelectionResult[]).map(category => {
         const items = visible.filter(p => selectionResult(selection.results?.[p.id]) === category)
         return <div key={category}><button className="wb-archive-toggle" aria-expanded={expanded === category} onClick={() => setExpanded(expanded === category ? null : category)}><ChevronRight size={16} /><strong>{category}</strong><span>{items.length} 個學程</span><small>{expanded === category ? '收合' : '展開查看'}</small></button>{expanded === category && <ResultColumn category={category} programs={items} selection={selection} onAssign={assign} onOpen={onOpen} />}</div>

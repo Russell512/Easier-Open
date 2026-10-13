@@ -593,12 +593,15 @@ export function downloadWorkbook(
   downloadBlob(new Blob([data], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' }), fileName)
 }
 
-export function createProgramsCsv(workbook: XLSX.WorkBook, programs: ProgramView[], selection: SchoolSelectionState): string {
+export function createProgramsCsv(workbook: XLSX.WorkBook, programs: ProgramView[], selection: SchoolSelectionState, scope: 'all' | 'provided' = 'all'): string {
   const exported = cloneWorkbook(workbook)
   applySchoolSelectionExport(exported, programs, selection)
-  const rows = XLSX.utils.sheet_to_json<Record<string, CellValue>>(exported.Sheets.Programs!, { defval: null })
-  const first = ['Program Name', 'Degree', 'University', 'Campus', 'Delivery Mode', 'Program ID']
-  const fields = [...first, ...Object.keys(rows[0] ?? {}).filter((field) => !first.includes(field))]
+  const allRows = XLSX.utils.sheet_to_json<Record<string, CellValue>>(exported.Sheets.Programs!, { defval: null })
+  const byId = new Map(allRows.map(row => [makeProgramKey(row.University, row['Program Name']), row]))
+  const rows = scope === 'provided' ? programs.flatMap(program => { const row = byId.get(program.id); return row ? [row] : [] }) : allRows
+  const first = [...(scope === 'provided' ? ['Selection Result'] : []), 'Program Name', 'Degree', 'University', 'Campus', 'Delivery Mode', 'Program ID']
+  const headers = XLSX.utils.sheet_to_json<string[]>(exported.Sheets.Programs!, { header: 1 })[0] ?? []
+  const fields = [...first, ...headers.filter(field => field && !first.includes(field))]
   const sheet = XLSX.utils.aoa_to_sheet([fields, ...rows.map((row) => fields.map((field) => row[field] ?? null))], { cellDates: true })
   return '\uFEFF' + XLSX.utils.sheet_to_csv(sheet)
 }

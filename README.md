@@ -4,7 +4,7 @@
 
 **把研究所申請整理成自己的工作區。**
 
-Easier 是免費、開源的學程研究與申請管理工具：整理選校結果、比較不同 program、記錄想法、追蹤材料與文件。採用繁體中文介面，內建像編輯器一樣的並排工作區。
+Easier 是免費、開源的學程研究與申請管理工具：整理選校結果、比較不同 program、記錄想法、追蹤材料與文件。採用繁體中文介面，內建像編輯器一樣的並排工作區；導覽集中於單一側欄，拖曳時僅顯示游標所在的淡色落點預覽。
 
 **Free, open-source graduate application workspace.** Organize programs, shortlist decisions, notes, documents and application materials. Traditional Chinese interface. Works locally without an account; optional Supabase sync uses your own project.
 
@@ -15,7 +15,7 @@ Easier 是免費、開源的學程研究與申請管理工具：整理選校結�
 ## 可以做什麼？
 
 - **以學程為單位研究**：同一所學校的 MSCS、MCS 或其他學位分開管理；查看要求、時程、研究線索與官方連結。
-- **清楚的選校結果**：彩票、衝刺、主申、較為保險分成四個向下排列的區域，卡片依可用寬度排列。未分類與淘汰預設收合，展開後仍可搜尋、重新分類。
+- **清楚的選校結果**：彩票、衝刺、主申、較為保險分成四個向下排列的區域，卡片依可用寬度排列。頁面上方的「匯出選校 CSV」只包含這四類中的全部學程，不受搜尋影響；分類置前，保留目前修改的學程資料。未分類與淘汰預設收合，展開後仍可搜尋、重新分類。
 - **最多四欄並排**：拖曳頂部分頁或筆記到內容的左／右側，或用「並排開啟」選單。每欄獨立捲動；三點分隔線可拖曳調寬，雙擊平分，方向鍵微調。右上角 × 關閉後，其他欄位按比例填補空間。
 - **Notes 側欄**：像筆記 App 一樣集中查看、搜尋、新增筆記。點選在右側開啟；可同時編輯不同筆記，每篇包含文字與 checklist。學程專屬筆記也會出現在清單。
 - **材料與文件**：追蹤 CV、SOP、成績單、考試、推薦信；保留文件版本及適用學程。加入文件不代表已提交申請。
@@ -96,6 +96,7 @@ npm run preview
 npm run lint
 npm run typecheck
 npm run test:tabs
+npm run test:shortlist
 npm run test:notes
 npm run test:documents
 npm run test:autosync

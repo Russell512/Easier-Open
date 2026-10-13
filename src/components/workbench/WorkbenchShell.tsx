@@ -5,7 +5,7 @@ import { workspacePage, type WorkspacePage, type WorkspacePane } from '../../lib
 import { NotesList } from '../NotesPage'
 import type { ApplicationNotesController } from '../../hooks/useApplicationNotes'
 import { WorkspacePanes } from './WorkspacePanes'
-import { dragPage, PAGE_DRAG_TYPE } from '../../lib/pageDrag'
+import { dragPage, readDraggedPage } from '../../lib/pageDrag'
 
 export const WORKSPACE_NAV = [
   { id: 'dashboard', label: '工作台', icon: LayoutDashboard },
@@ -32,7 +32,7 @@ export function WorkbenchShell({ tab, selectedProgram, programs, pages, panes, a
 }) {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [dragging, setDragging] = useState(false)
+  const [draggingId, setDraggingId] = useState<string | null>(null)
   const mainRef = useRef<HTMLElement>(null)
   const tabsRef = useRef<HTMLDivElement>(null)
   const tabRefs = useRef(new Map<string, HTMLButtonElement>())
@@ -65,11 +65,11 @@ export function WorkbenchShell({ tab, selectedProgram, programs, pages, panes, a
     else if (right > scroller.scrollLeft + scroller.clientWidth) scroller.scrollLeft = right - scroller.clientWidth
   }, [activeId, pages.length, collapsed])
   useEffect(() => {
-    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') setMobileOpen(false) }
+    const onKey = (event: KeyboardEvent) => { if (event.key === 'Escape') { setMobileOpen(false); setDraggingId(null) } }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
   }, [])
-  return <div className={`wb-shell ${collapsed ? 'sidebar-collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`} onDragStartCapture={event => { if (event.dataTransfer.types.includes(PAGE_DRAG_TYPE)) setDragging(true) }} onDragOver={event => { if (event.dataTransfer.types.includes(PAGE_DRAG_TYPE)) { event.preventDefault(); setDragging(true) } }} onDragEnd={() => setDragging(false)} onDrop={() => setDragging(false)}>
+  return <div className={`wb-shell ${collapsed ? 'sidebar-collapsed' : ''} ${mobileOpen ? 'mobile-open' : ''}`} onDragStart={event => { const page = readDraggedPage(event.dataTransfer); if (page) setDraggingId(page.id) }} onDragEnd={() => setDraggingId(null)} onDrop={() => setDraggingId(null)}>
     <a className="wb-skip" href="#workspace-content" onClick={(event) => { event.preventDefault(); mainRef.current?.querySelector<HTMLElement>('.wb-pane.focused [role="tabpanel"]')?.focus() }}>跳至主要內容</a>
     <header className="wb-titlebar">
       <button className="wb-brand" onClick={() => visit('dashboard')} aria-label="Easier 工作台"><span className="wb-brand-mark">e</span><strong>Easier</strong><span className="wb-version">WORKSPACE</span></button>
@@ -77,12 +77,12 @@ export function WorkbenchShell({ tab, selectedProgram, programs, pages, panes, a
       <div className="wb-titlebar-right"><span className="wb-cycle">FALL 2027</span><span className="wb-avatar" title="你的申請工作區">e</span></div>
     </header>
     <div className="wb-body">
-      <nav className="wb-activity" aria-label="快捷功能">{WORKSPACE_NAV.filter((item) => ['dashboard', 'programs', 'compare', 'documents', 'notes'].includes(item.id)).map(({ id, label, icon: Icon }) => <button key={id} title={label} aria-label={`前往${label}`} aria-current={tab === id && !selectedProgram ? 'page' : undefined} onClick={() => visit(id)}><Icon size={21} /></button>)}<div className="wb-activity-bottom"><button aria-label="使用說明" title="使用說明" onClick={onHelp}><CircleHelp size={20} /></button><button aria-label="資料與備份" title="資料與備份" onClick={() => visit('data')}><Database size={20} /></button></div></nav>
+
       {mobileOpen && <button className="wb-nav-scrim" aria-label="關閉導覽遮罩" onClick={() => setMobileOpen(false)} />}
       <aside className="wb-sidebar" aria-label="工作區導覽">
-        <div className="wb-sidebar-title"><span>申請工作區</span><button className="wb-icon-button" aria-label="收合側欄" onClick={() => { setCollapsed(true); setMobileOpen(false) }}><PanelLeftClose size={15} /></button></div>
+        <div className="wb-sidebar-title"><span>申請工作區</span><div className="wb-sidebar-tools"><button className="wb-icon-button" aria-label="使用說明" title="使用說明" onClick={onHelp}><CircleHelp size={15} /></button><button className="wb-icon-button" aria-label="收合側欄" onClick={() => { setCollapsed(true); setMobileOpen(false) }}><PanelLeftClose size={15} /></button></div></div>
         <div className="wb-sidebar-scroll"><nav className="wb-navigation" aria-label="主要導覽">{WORKSPACE_NAV.map(({ id, label, icon: Icon }) => <button key={id} onClick={() => visit(id)} aria-current={!selectedProgram && tab === id ? 'page' : undefined}><Icon size={16} /><span>{label}</span>{id === 'compare' && compareCount > 0 ? <small>{compareCount}</small> : id === 'programs' ? <small>{programs.length}</small> : null}</button>)}</nav>
-          <NotesList compact notes={notes} onOpen={id => { setMobileOpen(false); onOpenNote(id) }} onDragNote={() => setDragging(true)} />
+          <NotesList compact notes={notes} onOpen={id => { setMobileOpen(false); onOpenNote(id) }} />
         </div>
         <button className="wb-sidebar-footer" onClick={() => visit('data')}><Database size={15} /><span>申請工作區<small>管理資料與備份</small></span><ChevronRight size={13} /></button>
       </aside>
@@ -98,7 +98,7 @@ export function WorkbenchShell({ tab, selectedProgram, programs, pages, panes, a
               const Icon = page.noteId ? NotebookPen : program ? GraduationCap : nav.icon
               const title = titleOf(page)
               const label = page.noteId ? title : program ? program.university.replace(/^(?:The )?University of /, '').replace(/ University$/, '') : nav.label
-              return <div key={page.id} draggable onDragStart={event => { dragPage(event, page); setDragging(true) }} role="presentation" className={`wb-workspace-tab ${page.id === activeId ? 'active' : ''}`} onMouseDown={(event) => { if (event.button === 1) event.preventDefault() }} onAuxClick={(event) => { if (event.button === 1) { event.preventDefault(); close(page.id) } }}>
+              return <div key={page.id} draggable onDragStart={event => { dragPage(event, page, title) }} role="presentation" className={`wb-workspace-tab ${page.id === activeId ? 'active' : ''}`} onMouseDown={(event) => { if (event.button === 1) event.preventDefault() }} onAuxClick={(event) => { if (event.button === 1) { event.preventDefault(); close(page.id) } }}>
                 <button ref={(element) => { if (element) tabRefs.current.set(page.id, element); else tabRefs.current.delete(page.id) }} role="tab" id={tabId(page.id)} aria-controls={panelId(page.id)} aria-selected={panes.some(p => p.pageId === page.id)} aria-label={title} tabIndex={page.id === activeId ? 0 : -1} className="wb-tab-select" title={title} onClick={() => activate(page.id)} onKeyDown={(event) => {
                   if (['ArrowRight', 'ArrowLeft', 'Home', 'End', 'Delete'].includes(event.key)) event.preventDefault()
                   if (event.key === 'ArrowRight') focusTab(index + 1)
@@ -114,7 +114,7 @@ export function WorkbenchShell({ tab, selectedProgram, programs, pages, panes, a
           <div className="wb-tab-scroll-actions"><button aria-label="分頁列向左捲動" title="分頁列向左捲動" onClick={() => tabsRef.current?.scrollBy({ left: -240, behavior: 'smooth' })}><ChevronLeft size={15} /></button><button aria-label="分頁列向右捲動" title="分頁列向右捲動" onClick={() => tabsRef.current?.scrollBy({ left: 240, behavior: 'smooth' })}><ChevronRight size={15} /></button></div>
         </div>
         <div className="wb-breadcrumb"><label className="wb-split-control"><Columns3 size={13} /><select aria-label="在右側並排開啟" value="" disabled={panes.length >= 4} onChange={event => { const page = pages.find(p => p.id === event.target.value) ?? (event.target.value.startsWith('note:') ? workspacePage('notes', null, event.target.value.slice(5)) : workspacePage('programs', event.target.value.slice(7))); onSplit(page) }}><option value="">{panes.length >= 4 ? '已開啟 4 欄' : '並排開啟…'}</option><optgroup label="功能分頁">{pages.filter(p => !p.school && !p.noteId && !panes.some(pane => pane.pageId === p.id)).map(p => <option key={p.id} value={p.id}>{titleOf(p)}</option>)}</optgroup><optgroup label="Notes">{notes.state.notes.filter(n => !panes.some(p => p.pageId === `note:${n.id}`)).map(n => <option key={n.id} value={`note:${n.id}`}>{n.title || '未命名筆記'}</option>)}</optgroup><optgroup label="學程">{programs.filter(p => !panes.some(pane => pane.pageId === `school:${p.id}`)).map(p => <option key={p.id} value={`school:${p.id}`}>{p.university} · {p.programName}</option>)}</optgroup></select></label><span className="wb-split-hint">拖曳分頁到內容左右側以並排 · {panes.length}/4 欄</span><span>Fall 2027</span><ChevronRight size={12} /><button onClick={() => visit(tab)}>{pageTitle}</button>{selectedProgram && <><ChevronRight size={12} /><span>{selectedProgram.university}</span></>}</div>
-        <main ref={mainRef} id="workspace-content" className="wb-pane-area" aria-label="主要內容"><WorkspacePanes pages={pages} panes={panes} activeId={activeId} title={titleOf} dragging={dragging} onActivate={onActivate} onClose={close} onSplit={onSplit} onResize={onResize}>{children}</WorkspacePanes></main>
+        <main ref={mainRef} id="workspace-content" className="wb-pane-area" aria-label="主要內容"><WorkspacePanes pages={pages} panes={panes} activeId={activeId} title={titleOf} draggingId={draggingId} onActivate={onActivate} onClose={close} onSplit={onSplit} onResize={onResize}>{children}</WorkspacePanes></main>
       </div>
     </div>
     <footer className="wb-statusbar"><span><span className={`wb-dot ${saveError ? 'error' : ''}`} />{saveError ? '儲存失敗，請先備份' : '申請工作區'}</span><span>{programs.length} 個學程</span><span>{editCount} 項資料修改</span><span className="wb-status-right"><Check size={12} />{saveError ? '需要處理' : '本機副本已保存'}<span>Fall 2027</span></span></footer>

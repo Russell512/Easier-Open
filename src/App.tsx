@@ -402,7 +402,7 @@ function App() {
         {tab === 'programs' && <SchoolsPage onAssign={assignResult} programs={programs} model={model} selection={schoolSelection} compareIds={validCompareIds} onToggleCompare={toggleCompare} onCompare={() => navigate('compare')} onOpen={openSchool} onEdit={editCell} />}
         {tab === 'compare' && <ComparisonPage programs={programs} selection={schoolSelection} compareIds={validCompareIds} onToggle={toggleCompare} onOpen={openSchool} onBrowse={() => navigate('programs')} />}
         {tab === 'documents' && <DocumentsPage library={library} programs={programs} />}
-        {tab === 'results' && <SelectionResultsPage programs={programs} selection={schoolSelection} onAssign={assignResult} onOpen={openSchool} />}
+        {tab === 'results' && <SelectionResultsPage model={model} programs={programs} selection={schoolSelection} onAssign={assignResult} onOpen={openSchool} />}
         {tab === 'selection' && <div className="wb-legacy"><SchoolSelectionPage model={model} programs={programs} selection={schoolSelection} onChange={setSchoolSelection} onOpenProgram={openSchool} onExport={exportExcel} /></div>}
         {tab === 'faculty' && <div className="wb-legacy"><FacultyExplorer model={model} onOpenFaculty={setSelectedFacultyId} /></div>}
         {tab === 'checklist' && <div className="wb-legacy"><ChecklistPage programs={programs} onEdit={editCell} focusProgramId={checklistProgramId} /></div>}

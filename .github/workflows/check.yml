@@ -12,4 +12,4 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run lint && npm run typecheck && npm run test:tabs && npm run test:notes && npm run test:documents && npm run test:autosync && npm run test:demo && npm run build:local
+      - run: npm run lint && npm run typecheck && npm run test:tabs && npm run test:shortlist && npm run test:notes && npm run test:documents && npm run test:autosync && npm run test:demo && npm run build:local

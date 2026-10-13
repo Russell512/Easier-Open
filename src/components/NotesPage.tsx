@@ -8,6 +8,8 @@ import {
   Search,
   Trash2,
 } from 'lucide-react'
+import { dragPage } from '../lib/pageDrag'
+import { workspacePage } from '../lib/workspaceTabs'
 import type { ApplicationNote } from '../lib/notes'
 import type { ApplicationNotesController } from '../hooks/useApplicationNotes'
 
@@ -134,13 +136,13 @@ export function NoteEditor({ notes, noteId }: { notes: ApplicationNotesControlle
             </div></div>
 }
 
-export function NotesList({ notes, onOpen, compact = false, onDragNote }: { notes: ApplicationNotesController; onOpen: (id: string) => void; compact?: boolean; onDragNote?: (id: string) => void }) {
+export function NotesList({ notes, onOpen, compact = false }: { notes: ApplicationNotesController; onOpen: (id: string) => void; compact?: boolean }) {
   const [search, setSearch] = useState('')
   const filtered = useMemo(() => [...notes.state.notes].sort((a,b) => b.updatedAt.localeCompare(a.updatedAt)).filter(note => `${note.title} ${note.body} ${note.checklist.map(item => item.text).join(' ')}`.toLowerCase().includes(search.toLowerCase())), [notes.state.notes, search])
   return <section className={`wb-notes-list ${compact ? 'compact' : ''}`} aria-label="Notes 清單">
     <header><div><h2>Notes</h2><span>{notes.state.notes.length} 篇筆記</span></div><button className="wb-icon-button" aria-label="新增 Note" title="新增 Note" onClick={() => onOpen(notes.createNote())}><Plus size={18} /></button></header>
     <label className="wb-sidebar-search"><Search size={14} /><input aria-label={compact ? '搜尋側欄 Notes' : '搜尋 Notes'} placeholder="搜尋筆記…" value={search} onChange={event => setSearch(event.target.value)} /></label>
-    <div className="wb-notes-items">{filtered.map(note => <button key={note.id} draggable onDragStart={event => { event.dataTransfer.setData('application/x-easier-page', JSON.stringify({ tab: 'notes', school: null, noteId: note.id })); event.dataTransfer.effectAllowed = 'move'; onDragNote?.(note.id) }} onClick={() => onOpen(note.id)} className={notes.state.selectedNoteId === note.id ? 'active' : ''} data-testid="note-list-item" title="點選在右側開啟，或拖曳到工作區並排"><strong>{noteTitle(note)}</strong><span>{noteTime(note.updatedAt)} · {noteSnippet(note)}</span>{note.programId && <small>學程筆記</small>}</button>)}{!filtered.length && <p className="wb-sidebar-empty">{search ? '找不到筆記' : '記下想法、學程比較或待辦事項。'}</p>}</div>
+    <div className="wb-notes-items">{filtered.map(note => <button key={note.id} draggable onDragStart={event => dragPage(event, workspacePage('notes', null, note.id), noteTitle(note))} onClick={() => onOpen(note.id)} className={notes.state.selectedNoteId === note.id ? 'active' : ''} data-testid="note-list-item" title="點選在右側開啟，或拖曳到工作區並排"><strong>{noteTitle(note)}</strong><span>{noteTime(note.updatedAt)} · {noteSnippet(note)}</span>{note.programId && <small>學程筆記</small>}</button>)}{!filtered.length && <p className="wb-sidebar-empty">{search ? '找不到筆記' : '記下想法、學程比較或待辦事項。'}</p>}</div>
   </section>
 }
 export function NotesPage({ notes, onOpen }: { notes: ApplicationNotesController; onOpen: (id: string) => void }) {
