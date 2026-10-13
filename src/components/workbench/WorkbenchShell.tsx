@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { ArrowLeftRight, BookOpen, Check, ChevronLeft, ChevronRight, CircleHelp, Columns3, Database, Files, GraduationCap, LayoutDashboard, ListChecks, ListOrdered, Menu, NotebookPen, PanelLeftClose, Search, UsersRound, X } from 'lucide-react'
+import { ArrowLeftRight, BookOpen, Check, ChevronLeft, ChevronRight, CircleHelp, Columns3, Database, Files, GraduationCap, LayoutDashboard, ListChecks, ListOrdered, Menu, NotebookPen, PanelLeftClose, UsersRound, X } from 'lucide-react'
 import type { AppTab, ProgramView } from '../../types'
 import { workspacePage, type WorkspacePage, type WorkspacePane } from '../../lib/workspaceTabs'
 import { NotesList } from '../NotesPage'
@@ -24,11 +24,11 @@ export const WORKSPACE_NAV = [
 function panelId(id: string) { return `workspace-panel-${encodeURIComponent(id)}` }
 function tabId(id: string) { return `workspace-tab-${encodeURIComponent(id)}` }
 
-export function WorkbenchShell({ tab, selectedProgram, programs, pages, panes, activeId, onActivate, onClose, onSplit, onResize, notes, onOpenNote, compareCount, editCount, saveError, onNavigate, onSearch, onHelp, children }: {
+export function WorkbenchShell({ tab, selectedProgram, programs, pages, panes, activeId, onActivate, onClose, onSplit, onResize, notes, onOpenNote, compareCount, editCount, saveError, onNavigate, search, onHelp, children }: {
   tab: AppTab; selectedProgram: ProgramView | null; programs: ProgramView[]; compareCount: number; editCount: number; saveError: boolean;
   panes: WorkspacePane[]; onSplit: (page: WorkspacePage, targetId?: string, side?: 'left' | 'right') => void; onResize: (index: number, size: number) => void; notes: ApplicationNotesController; onOpenNote: (id: string) => void;
   pages: WorkspacePage[]; activeId: string; onActivate: (id: string) => void; onClose: (id: string) => void;
-  onNavigate: (tab: AppTab) => void; onSearch: () => void; onHelp: () => void; children: (page: WorkspacePage) => ReactNode;
+  onNavigate: (tab: AppTab) => void; search: ReactNode; onHelp: () => void; children: (page: WorkspacePage) => ReactNode;
 }) {
   const [collapsed, setCollapsed] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -73,7 +73,7 @@ export function WorkbenchShell({ tab, selectedProgram, programs, pages, panes, a
     <a className="wb-skip" href="#workspace-content" onClick={(event) => { event.preventDefault(); mainRef.current?.querySelector<HTMLElement>('.wb-pane.focused [role="tabpanel"]')?.focus() }}>跳至主要內容</a>
     <header className="wb-titlebar">
       <button className="wb-brand" onClick={() => visit('dashboard')} aria-label="Easier 工作台"><span className="wb-brand-mark">e</span><strong>Easier</strong><span className="wb-version">WORKSPACE</span></button>
-      <button className="wb-command" onClick={onSearch} aria-label="搜尋學校、教授或功能"><Search size={14} /><span>搜尋學校、教授或功能…</span><kbd>⌘ K</kbd></button>
+      {search}
       <div className="wb-titlebar-right"><span className="wb-cycle">FALL 2027</span><span className="wb-avatar" title="你的申請工作區">e</span></div>
     </header>
     <div className="wb-body">
