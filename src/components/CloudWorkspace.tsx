@@ -4,6 +4,7 @@ import { cloud, LOCAL_MODE, LOCAL_CHANGE_EVENT } from '../lib/cloudClient'
 import { addExcelExport, applySnapshot, captureSnapshot, downloadCloudExcel, exportFullBackup, importFullBackup, needsConflictResolution, pushCloud, readBaseline, readCloud, snapshotSignature, writeBaseline, type Baseline } from '../lib/cloudSnapshot'
 import { STORAGE_KEY } from '../lib/workbook'
 import { createSyncQueue } from '../lib/syncQueue'
+import { signInWithGoogle } from '../lib/googleAuth'
 import './cloud.css'
 
 export function CloudWorkspace({ children }: { children: ReactNode }) {
@@ -26,9 +27,22 @@ export function CloudWorkspace({ children }: { children: ReactNode }) {
   const uid = session?.user.id
   const backupInput = useRef<HTMLInputElement>(null)
   const [editor, setEditor] = useState(false)
+  const [access, setAccess] = useState<{ userId: string; allowed: boolean } | null>(null)
+  const canEdit = !!uid && access?.userId === uid && access.allowed
 
   useEffect(() => {
-    if (!uid) return
+    if (!uid || !cloud) return
+    let cancelled = false
+    void cloud.rpc('easier_can_edit_workspace').then(({ data, error }) => {
+      if (cancelled) return
+      if (error) { setError('無法確認工作區權限，請稍後重試'); return }
+      setAccess({ userId: uid, allowed: data === true })
+    })
+    return () => { cancelled = true }
+  }, [uid])
+
+  useEffect(() => {
+    if (!uid || !canEdit) return
     let release: (() => void) | undefined
     let cancelled = false
     if (!navigator.locks) { setEditor(true); return }
@@ -39,7 +53,7 @@ export function CloudWorkspace({ children }: { children: ReactNode }) {
       await new Promise<void>((resolve) => { release = resolve })
     })
     return () => { cancelled = true; release?.(); setEditor(false) }
-  }, [uid])
+  }, [uid, canEdit])
 
   useEffect(() => {
     if (!cloud) return
@@ -49,7 +63,7 @@ export function CloudWorkspace({ children }: { children: ReactNode }) {
   }, [])
 
   useEffect(() => {
-    if (!uid || !editor) return
+    if (!uid || !canEdit || !editor) return
     let cancelled = false
     setReady(false); blocked.current = false; setConflict(false); setError('')
     async function initialize() {
@@ -82,10 +96,10 @@ export function CloudWorkspace({ children }: { children: ReactNode }) {
     }
     void initialize()
     return () => { cancelled = true }
-  }, [uid, editor])
+  }, [uid, canEdit, editor])
 
   const syncPass = useCallback(async () => {
-    if (!uid || !ready || blocked.current || !baseline.current) return false
+    if (!uid || !canEdit || !ready || blocked.current || !baseline.current || baseline.current.userId !== uid) return false
     working.current = true
     try {
       const { snapshot, files } = await captureSnapshot(uid)
@@ -108,12 +122,12 @@ export function CloudWorkspace({ children }: { children: ReactNode }) {
       else { setError(message); setStatus('尚未同步，資料仍保存在本機') }
       return false
     } finally { working.current = false }
-  }, [uid, ready])
+  }, [uid, canEdit, ready])
   const syncQueue = useMemo(() => createSyncQueue(syncPass), [syncPass])
   const sync = syncQueue.request
 
   useEffect(() => {
-    if (!ready) return
+    if (!ready || !canEdit) return
     let timer: ReturnType<typeof setTimeout> | undefined
     const flush = () => { clearTimeout(timer); timer = undefined; void sync() }
     const changed = () => {
@@ -134,10 +148,10 @@ export function CloudWorkspace({ children }: { children: ReactNode }) {
     window.addEventListener('beforeunload', beforeUnload)
     changed()
     return () => { clearTimeout(timer); clearInterval(interval); window.removeEventListener(LOCAL_CHANGE_EVENT, changed); window.removeEventListener('online', online); window.removeEventListener('pagehide', flush); document.removeEventListener('visibilitychange', visibilityChanged); window.removeEventListener('beforeunload', beforeUnload) }
-  }, [ready, sync])
+  }, [ready, canEdit, sync])
 
   useEffect(() => {
-    if (!uid || !ready) return
+    if (!uid || !canEdit || !ready) return
     const interval = setInterval(async () => {
       if (working.current || blocked.current) return
       try {
@@ -151,7 +165,7 @@ export function CloudWorkspace({ children }: { children: ReactNode }) {
       } catch { /* The next save reports connectivity errors; do not erase local data. */ }
     }, 20_000)
     return () => clearInterval(interval)
-  }, [uid, ready])
+  }, [uid, canEdit, ready])
 
   async function loadCloudVersion() {
     if (!uid) return
@@ -207,7 +221,9 @@ export function CloudWorkspace({ children }: { children: ReactNode }) {
     return <><div className="cloud-bar">本機模式 · 尚未連接雲端 <button onClick={() => void run(exportFullBackup)}>下載完整搬移備份</button><button onClick={() => backupInput.current?.click()}>匯入完整備份</button></div>{error && <div className="cloud-error">{error}</div>}{backupChooser}{children}</>
   }
   if (!authReady) return <div className="cloud-screen">正在確認登入狀態…</div>
-  if (!session) return <main className="cloud-screen"><form onSubmit={(event) => void signIn(event)}><p className="cloud-brand">EASIER / FALL 2027</p><h1>你的申請工作區</h1><p>登入後，在不同裝置接續整理學校、文件與筆記。</p><label>Email<input type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} /></label><label>密碼<input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label><button disabled={busy} type="submit">{busy ? '正在登入…' : '登入工作區'}</button>{error && <p role="alert">{error}</p>}</form></main>
+  if (!session) return <main className="cloud-screen"><form onSubmit={(event) => void signIn(event)}><p className="cloud-brand">EASIER</p><h1>登入工作區</h1><button type="button" className="cloud-google" disabled={busy} onClick={() => { setBusy(true); void run(signInWithGoogle).finally(() => setBusy(false)) }}>使用 Google 帳號登入</button><div className="cloud-login-divider">或使用 Email</div><label>Email<input type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} /></label><label>密碼<input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label><button disabled={busy} type="submit">{busy ? '正在登入…' : '登入工作區'}</button>{error && <p role="alert">{error}</p>}<a href="/privacy.html">隱私權說明</a></form></main>
+  if (!access || access.userId !== uid) return <main className="cloud-screen"><h1>{error ? '無法確認權限' : '正在確認權限…'}</h1>{error && <><p role="alert">{error}</p><button onClick={() => window.location.reload()}>重試</button></>}<button onClick={() => void cloud!.auth.signOut()}>登出</button></main>
+  if (!canEdit) return <main className="cloud-screen"><div className="cloud-viewer"><p className="cloud-brand">EASIER · 唯讀帳號</p><h1>請使用分享連結</h1><p>此帳號沒有編輯權限。透過擁有者提供的連結，可以查看已分享的選校結果。</p><p>{session.user.email}</p><button onClick={() => void cloud!.auth.signOut()}>登出並切換帳號</button></div></main>
   return <>
     <div className="cloud-bar" role="status"><span>自動同步已開啟 · {status}</span><span className="cloud-account">{session.user.email}</span>
       {ready && !conflict && !remoteChanged && <button onClick={() => void sync()}>立即同步</button>}

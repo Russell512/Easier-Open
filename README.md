@@ -82,13 +82,23 @@ npm run preview
 ### 使用自己的 Supabase（選用）
 
 1. 建立 Supabase 專案，按檔名順序執行 `supabase/migrations/` 的 SQL，建立工作區、版本歷史、私人 storage bucket 與 RLS。
-2. 在 Authentication 建立自己的 email/password 使用者。應用程式提供登入，不提供公開註冊介面。
-3. 在 Storage 的私人 `easier-private` bucket，把起始 Excel 上傳到 `<使用者 UUID>/seed/update_info.xlsx`。每位使用者各自需要一份 seed。
+2. 在 Authentication 建立自己的 email/password 使用者，並在 SQL Editor 執行 `insert into public.easier_workspace_owners(user_id) values ('你的使用者 UUID');`。只有名單中的帳號可以編輯；其他登入者只能透過分享連結查看。
+3. 在 Storage 的私人 `easier-private` bucket，把起始 Excel 上傳到 `<使用者 UUID>/seed/update_info.xlsx`。每位擁有者各自需要一份 seed。
 4. 複製 `.env.example` 為 `.env.local`，填入你自己的 Supabase URL 與 **publishable / anon client key**。把 `VITE_LOCAL_MODE` 設為 `false`。**不要使用 `service_role` 金鑰**。
 5. 部署環境也設定相同變數，將 Vercel 的 Build Command 改為 `npm run build:cloud`。`build:cloud` 會移除 `dist/data`，雲端 seed 改由登入後私下取得。
 6. 先用測試帳號確認登入、編輯、重新登入与完整備份，再搬入自己的資料。
 
 不要把 `.env.local`、資料庫備份或私人 Excel 提交進公開 repo。同步會檢查 revision；遇到兩台裝置同時修改，先备份再選擇版本。一次只允許同一瀏覽器一個分頁編輯雲端工作區，應用程式內的四欄不受此限制。
+
+### Google 登入與唯讀分享
+
+依 [Supabase Google 登入文件](https://supabase.com/docs/guides/auth/social-login/auth-google)，在 Google Auth Platform 建立 Web OAuth 用戶端，將 Supabase 的 `/auth/v1/callback` 加到 Authorized redirect URIs，再把 Client ID / Secret 填入 Supabase 的 Google provider。Secret 只放在 Supabase，不可放進 `VITE_*`。在 Supabase URL Configuration 設定網站網址與允許的回跳網址。同一個已驗證 Email 的 Google 身分會連接到原有帳號；編輯權限依資料庫的使用者 UUID 判斷。
+
+Google 品牌設定需填寫實際網站首頁與隱私權說明。部署前請按你的服務設定修改 `public/privacy.html` 與聯絡方式，並在 Google Auth Platform 將目標對象設為正式發布。只需基本 `openid`、Email 與個人資料範圍，無須 Gmail 或 Drive 權限。Supabase Redirect URLs 可使用你的正式網站 `https://你的網域/**`，讓登入後保留分享連結；不要允許不受你控制的網域。
+
+在「選校結果 → 分享」開啟連結，可選持有連結即可查看，或必須登入。分享預設關閉，僅包含彩票、衝刺、主申、較為保險及學程公開資訊。私人筆記、文件、個人評分和準備進度不會放入分享資料。雲端同步時會更新分享內容；可停止分享或更換連結。分享頁每 20 秒及回到頁面時重新檢查；停止分享後，已開啟的頁面會在下一次檢查隱藏內容。
+
+分享使用獨立的唯讀頁面與資料庫 RPC；匿名使用者不能列出分享 token，也無法取得完整工作區或寫入資料。純本機模式不提供連結分享。
 
 ## 開發與檢查
 
@@ -97,6 +107,7 @@ npm run lint
 npm run typecheck
 npm run test:tabs
 npm run test:shortlist
+npm run test:sharing
 npm run test:notes
 npm run test:documents
 npm run test:autosync

@@ -1,0 +1,35 @@
+.wb-share-dialog { width: min(480px, calc(100vw - 32px)); max-height: calc(100dvh - 48px); overflow: auto; margin: auto; padding: 24px; border: 1px solid var(--wb-border); border-radius: 12px; background: var(--wb-panel); color: var(--wb-text); box-shadow: 0 20px 80px #0006; }
+.wb-share-dialog::backdrop { background: #080c16aa; }
+.wb-share-dialog > header { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 16px; }
+.wb-share-dialog h2 { display: flex; gap: 10px; align-items: center; margin: 0; font-size: 20px; }
+.wb-share-dialog p { line-height: 1.7; }
+.wb-share-dialog .wb-field-label { margin-top: 18px; }
+.wb-share-dialog .wb-field-label select, .wb-share-dialog .wb-field-label input { width: 100%; box-sizing: border-box; }
+.wb-share-dialog footer { margin-top: 24px; padding-top: 20px; border-top: 1px solid var(--wb-border); }
+.wb-share-state { display: flex; justify-content: space-between; align-items: center; padding: 16px 0 0; }
+.cloud-screen .cloud-google { background: #f7f9fc; color: #202124; border: 1px solid #bcc4ce; }
+.cloud-login-divider { margin-top: 24px; color: #afc2b5; text-align: center; font-size: 12px; }
+.cloud-viewer { max-width: 460px; }
+.shared-page { min-height: 100dvh; }
+.shared-topbar { display: flex; align-items: center; gap: 24px; flex-wrap: wrap; padding: 18px 28px; border-bottom: 1px solid var(--wb-border); background: var(--wb-panel); }
+.shared-topbar > .wb-actions { margin-left: auto; }
+.shared-readonly { display: flex; align-items: center; gap: 7px; color: var(--wb-muted); font-size: 12px; }
+.shared-content { max-width: 1300px; margin: 0 auto; padding: 36px 28px 60px; }
+.shared-content > .wb-search { max-width: 420px; }
+.shared-groups { display: grid; gap: 24px; margin-top: 28px; }
+.shared-groups .wb-result-column { min-height: 0; }
+.shared-program-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(360px,100%), 1fr)); gap: 16px; padding: 16px; }
+.shared-program { min-width: 0; padding: 20px; border: 1px solid var(--wb-border); border-radius: 8px; background: var(--wb-panel); }
+.shared-program h3 { margin: 6px 0; font-size: 20px; line-height: 1.5; }
+.shared-program > p:first-child { margin-top: 0; }
+.shared-program details { margin-top: 20px; border-top: 1px solid var(--wb-border); padding-top: 16px; }
+.shared-program summary { cursor: pointer; color: var(--wb-blue); }
+.shared-facts { margin: 20px 0; }
+.shared-facts > div { padding: 10px 0; border-bottom: 1px solid #343b484d; }
+.shared-facts dt { color: var(--wb-muted); font-size: 11px; margin-bottom: 5px; }
+.shared-facts dd { margin: 0; line-height: 1.7; font-size: 13px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.shared-facts small { display: block; color: var(--wb-muted); }
+.shared-facts .wb-link { margin-right: 10px; }
+.shared-empty { text-align: center; padding: 70px 20px; color: var(--wb-muted); }
+.shared-empty h1 { color: var(--wb-text); }
+@media (max-width: 600px) { .shared-topbar { padding: 14px 18px; gap: 14px; }.shared-topbar .wb-muted { display: none; }.shared-content { padding: 26px 16px; }.shared-program-grid { padding: 10px; }.shared-program { padding: 16px; }.wb-share-dialog { padding: 20px; } }

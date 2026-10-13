@@ -16,6 +16,7 @@
     "build:cloud": "node scripts/verify-cloud-config.mjs && npm run build && node scripts/prepare-cloud-build.mjs",
     "build:local": "node scripts/build-local.mjs",
     "test:shortlist": "node scripts/check-shortlist-export.mjs",
+    "test:sharing": "node scripts/check-sharing.mjs",
     "test:demo": "node scripts/check-demo.mjs"
   },
   "dependencies": {

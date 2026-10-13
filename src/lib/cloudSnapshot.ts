@@ -3,6 +3,7 @@ import { readDocuments, replaceDocuments, parseDocumentsBackup, serializeDocumen
 import { STORAGE_KEY, PRE_UPDATE_BACKUP_KEY, base64ToArrayBuffer, parseWorkbook, buildProgramViews, createExportWorkbook } from './workbook'
 import { reconcileSchoolSelection } from './selection'
 import type { PersistedTracker } from '../types'
+import { createSharedShortlist, type SharedShortlist } from './sharedShortlist'
 
 export const SYNC_KEYS = [STORAGE_KEY, PRE_UPDATE_BACKUP_KEY, 'easier-application-notes-v2', 'easier-global-notes-v1', 'easier-sop-material-bank-v1', 'easier-comparison-v1'] as const
 export type CloudDocument = Omit<ApplicationDocument, 'blob'> & { path?: string; mime?: string }
@@ -11,13 +12,14 @@ export interface Snapshot {
   values: Record<string, string>
   documents: CloudDocument[]
   workbookPath?: string
+  shortlist?: SharedShortlist
 }
 export interface CloudRow { revision: number; payload: Snapshot; updated_at: string }
 export interface Baseline { userId: string; revision: number; signature: string }
 const BASELINE_KEY = 'easier-cloud-baseline-v1'
 const blobCache = new Map<string, { path: string; blob: Blob }>()
 const uploaded = new Set<string>()
-let excelCache: { source: string; path: string; blob: Blob } | undefined
+let excelCache: { source: string; path: string; blob: Blob; shortlist: SharedShortlist } | undefined
 export async function readBaseline(): Promise<Baseline | null> {
   try {
     const value = JSON.parse(localStorage.getItem(BASELINE_KEY) || 'null') as Baseline | null
@@ -89,10 +91,13 @@ export async function addExcelExport(userId: string, snapshot: Snapshot, files: 
   const source = JSON.stringify({ ...tracker, savedAt: '' })
   if (excelCache?.source !== source || !excelCache.path.startsWith(`${userId}/`)) {
     const model = parseWorkbook(base64ToArrayBuffer(tracker.sourceBase64), tracker.edits)
-    const blob = new Blob([createExportWorkbook(model.workbook, buildProgramViews(model), reconcileSchoolSelection(model, tracker.schoolSelection))], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
-    excelCache = { source, path: `${userId}/exports/${await hash(blob)}.xlsx`, blob }
+    const programs = buildProgramViews(model)
+    const selection = reconcileSchoolSelection(model, tracker.schoolSelection)
+    const blob = new Blob([createExportWorkbook(model.workbook, programs, selection)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
+    excelCache = { source, path: `${userId}/exports/${await hash(blob)}.xlsx`, blob, shortlist: createSharedShortlist(programs, selection) }
   }
   snapshot.workbookPath = excelCache.path
+  snapshot.shortlist = excelCache.shortlist
   files.set(excelCache.path, excelCache.blob)
 }
 export async function readCloud(userId: string): Promise<CloudRow | null> {
