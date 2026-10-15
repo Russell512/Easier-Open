@@ -5,6 +5,8 @@ import { addExcelExport, applySnapshot, captureSnapshot, downloadCloudExcel, exp
 import { STORAGE_KEY } from '../lib/workbook'
 import { createSyncQueue } from '../lib/syncQueue'
 import { signInWithGoogle } from '../lib/googleAuth'
+import { WorkspaceAccountContext, type WorkspaceAccount } from '../lib/workspaceAccount'
+import { AccountMenu } from './AccountMenu'
 import './cloud.css'
 
 export function CloudWorkspace({ children }: { children: ReactNode }) {
@@ -14,8 +16,6 @@ export function CloudWorkspace({ children }: { children: ReactNode }) {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
-  const [changingPassword, setChangingPassword] = useState(false)
-  const [newPassword, setNewPassword] = useState('')
   const [status, setStatus] = useState('正在讀取雲端資料…')
   const [error, setError] = useState('')
   const [conflict, setConflict] = useState(false)
@@ -216,32 +216,36 @@ export function CloudWorkspace({ children }: { children: ReactNode }) {
   }
   async function run(action: () => Promise<void>) { setError(''); try { await action() } catch (reason) { setError(reason instanceof Error ? reason.message : '操作失敗') } }
 
+  const account: WorkspaceAccount = {
+    user: session?.user ?? null, local: !cloud, status, error, busy, ready: !cloud || ready, conflict, remoteChanged,
+    sync: () => run(async () => { await sync() }),
+    backup: () => run(exportFullBackup),
+    importBackup: () => backupInput.current?.click(),
+    downloadExcel: () => run(() => downloadCloudExcel(uid!)),
+    loadCloud: () => run(loadCloudVersion),
+    keepLocal: () => run(keepLocalVersion),
+    signOut: () => run(async () => {
+      await sync()
+      if (dirty.current || working.current || blocked.current) throw new Error('請先完成同步或處理版本衝突，再登出')
+      const { error } = await cloud!.auth.signOut()
+      if (error) throw error
+      setReady(false)
+    }),
+  }
+
   if (!cloud) {
     if (import.meta.env.PROD && !LOCAL_MODE) return <div className="cloud-screen"><h1>雲端設定尚未完成</h1><p>請設定 Supabase 連線後重新部署。</p></div>
-    return <><div className="cloud-bar">本機模式 · 尚未連接雲端 <button onClick={() => void run(exportFullBackup)}>下載完整搬移備份</button><button onClick={() => backupInput.current?.click()}>匯入完整備份</button></div>{error && <div className="cloud-error">{error}</div>}{backupChooser}{children}</>
+    return <WorkspaceAccountContext.Provider value={account}><div className="cloud-workspace">{error && <div className="cloud-error" role="alert">{error}</div>}{backupChooser}<div className="cloud-workspace-content" inert={busy}>{children}</div></div></WorkspaceAccountContext.Provider>
   }
   if (!authReady) return <div className="cloud-screen">正在確認登入狀態…</div>
   if (!session) return <main className="cloud-screen"><form onSubmit={(event) => void signIn(event)}><p className="cloud-brand">EASIER</p><h1>登入工作區</h1><button type="button" className="cloud-google" disabled={busy} onClick={() => { setBusy(true); void run(signInWithGoogle).finally(() => setBusy(false)) }}>使用 Google 帳號登入</button><div className="cloud-login-divider">或使用 Email</div><label>Email<input type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} /></label><label>密碼<input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label><button disabled={busy} type="submit">{busy ? '正在登入…' : '登入工作區'}</button>{error && <p role="alert">{error}</p>}<a href="/privacy.html">隱私權說明</a></form></main>
   if (!access || access.userId !== uid) return <main className="cloud-screen"><h1>{error ? '無法確認權限' : '正在確認權限…'}</h1>{error && <><p role="alert">{error}</p><button onClick={() => window.location.reload()}>重試</button></>}<button onClick={() => void cloud!.auth.signOut()}>登出</button></main>
   if (!canEdit) return <main className="cloud-screen"><div className="cloud-viewer"><p className="cloud-brand">EASIER · 唯讀帳號</p><h1>請使用分享連結</h1><p>此帳號沒有編輯權限。透過擁有者提供的連結，可以查看已分享的選校結果。</p><p>{session.user.email}</p><button onClick={() => void cloud!.auth.signOut()}>登出並切換帳號</button></div></main>
-  return <>
-    <div className="cloud-bar" role="status"><span>自動同步已開啟 · {status}</span><span className="cloud-account">{session.user.email}</span>
-      {ready && !conflict && !remoteChanged && <button onClick={() => void sync()}>立即同步</button>}
-      {(conflict || remoteChanged) && <button disabled={busy} onClick={() => void loadCloudVersion()}>備份本機並載入雲端</button>}
-      <button onClick={() => void run(exportFullBackup)}>完整備份</button>
-      {conflict && <button disabled={busy} onClick={() => void keepLocalVersion()}>保留本機版本</button>}
-      {ready && !conflict && !remoteChanged && <button disabled={busy} onClick={() => backupInput.current?.click()}>匯入完整備份</button>}
-      <button onClick={() => setChangingPassword((value) => !value)}>修改密碼</button>
-      {ready && <button onClick={() => void run(() => downloadCloudExcel(uid!))}>雲端 Excel</button>}
-      <button onClick={() => void run(async () => {
-        await sync()
-        if (dirty.current || working.current || blocked.current) throw new Error('請先完成同步或處理版本衝突，再登出')
-        await cloud!.auth.signOut(); setReady(false)
-      })}>登出</button>
-    </div>
+  return <WorkspaceAccountContext.Provider value={account}><div className="cloud-workspace">
+    {!ready && <header className="cloud-pending-header"><strong>Easier</strong><AccountMenu /></header>}
+    {(conflict || remoteChanged) && <div className="cloud-notice" role="alert"><span>{status}</span><button disabled={busy} onClick={() => void account.loadCloud()}>備份本機並載入雲端</button>{conflict && <button disabled={busy} onClick={() => void account.keepLocal()}>保留本機版本</button>}</div>}
     {error && <div className="cloud-error" role="alert">{error} <button onClick={() => ready ? void sync() : window.location.reload()}>重試</button></div>}
-    {changingPassword && <form className="cloud-password" onSubmit={(event) => { event.preventDefault(); void run(async () => { setBusy(true); try { const { error } = await cloud!.auth.updateUser({ password: newPassword }); if (error) throw error; setNewPassword(''); setChangingPassword(false); setStatus('密碼已更新') } finally { setBusy(false) } }) }}><label>新密碼（至少 12 個字元）<input type="password" autoComplete="new-password" minLength={12} required value={newPassword} onChange={(event) => setNewPassword(event.target.value)} /></label><button disabled={busy} type="submit">儲存新密碼</button><button type="button" onClick={() => { setChangingPassword(false); setNewPassword('') }}>取消</button></form>}
     {backupChooser}
-    {ready ? <div inert={busy}>{children}</div> : <div className="cloud-screen"><h1>{conflict ? '保留你的本機修改' : '正在準備工作區'}</h1><p>{conflict ? '先下載完整備份，再使用上方按鈕載入雲端。原有修改不會自動覆蓋。' : '讀取雲端資料與文件中…'}</p></div>}
-  </>
+    {ready ? <div className="cloud-workspace-content" inert={busy}>{children}</div> : <div className="cloud-screen"><h1>{conflict ? '保留你的本機修改' : '正在準備工作區'}</h1><p>{conflict ? '載入雲端前會先下載完整備份。原有修改不會自動覆蓋。' : '讀取雲端資料與文件中…'}</p></div>}
+  </div></WorkspaceAccountContext.Provider>
 }

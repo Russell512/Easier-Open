@@ -1,7 +1,8 @@
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
-import { ArrowLeftRight, BookOpen, Check, ChevronLeft, ChevronRight, CircleHelp, Columns3, Database, Files, GraduationCap, LayoutDashboard, ListChecks, ListOrdered, Menu, NotebookPen, PanelLeftClose, UsersRound, X } from 'lucide-react'
+import { ArrowLeftRight, BookOpen, ChevronLeft, ChevronRight, CircleHelp, Columns3, Database, Files, GraduationCap, LayoutDashboard, ListChecks, ListOrdered, Menu, NotebookPen, PanelLeftClose, UsersRound, X } from 'lucide-react'
 import type { AppTab, ProgramView } from '../../types'
 import { workspacePage, type WorkspacePage, type WorkspacePane } from '../../lib/workspaceTabs'
+import { AccountMenu, WorkspaceSyncStatus } from '../AccountMenu'
 import { NotesList } from '../NotesPage'
 import type { ApplicationNotesController } from '../../hooks/useApplicationNotes'
 import { WorkspacePanes } from './WorkspacePanes'
@@ -74,7 +75,7 @@ export function WorkbenchShell({ tab, selectedProgram, programs, pages, panes, a
     <header className="wb-titlebar">
       <button className="wb-brand" onClick={() => visit('dashboard')} aria-label="Easier 工作台"><span className="wb-brand-mark">e</span><strong>Easier</strong><span className="wb-version">WORKSPACE</span></button>
       {search}
-      <div className="wb-titlebar-right"><span className="wb-cycle">FALL 2027</span><span className="wb-avatar" title="你的申請工作區">e</span></div>
+      <div className="wb-titlebar-right"><span className="wb-cycle">FALL 2027</span><AccountMenu /></div>
     </header>
     <div className="wb-body">
 
@@ -117,6 +118,6 @@ export function WorkbenchShell({ tab, selectedProgram, programs, pages, panes, a
         <main ref={mainRef} id="workspace-content" className="wb-pane-area" aria-label="主要內容"><WorkspacePanes pages={pages} panes={panes} activeId={activeId} title={titleOf} draggingId={draggingId} onActivate={onActivate} onClose={close} onSplit={onSplit} onResize={onResize}>{children}</WorkspacePanes></main>
       </div>
     </div>
-    <footer className="wb-statusbar"><span><span className={`wb-dot ${saveError ? 'error' : ''}`} />{saveError ? '儲存失敗，請先備份' : '申請工作區'}</span><span>{programs.length} 個學程</span><span>{editCount} 項資料修改</span><span className="wb-status-right"><Check size={12} />{saveError ? '需要處理' : '本機副本已保存'}<span>Fall 2027</span></span></footer>
+    <footer className="wb-statusbar"><span><span className={`wb-dot ${saveError ? 'error' : ''}`} />{saveError ? '儲存失敗，請先備份' : '申請工作區'}</span><span>{programs.length} 個學程</span><span>{editCount} 項資料修改</span><span className="wb-status-right">{saveError ? '需要處理' : <WorkspaceSyncStatus />}<span className="wb-status-cycle">Fall 2027</span></span></footer>
   </div>
 }
