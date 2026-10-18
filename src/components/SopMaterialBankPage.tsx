@@ -1,5 +1,5 @@
 import { saveLocalValue } from '../lib/cloudClient'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useId, useMemo, useState } from 'react'
 import {
   DndContext,
   DragOverlay,
@@ -95,6 +95,7 @@ export function SopMaterialBankPage({ programs }: { programs: ProgramView[] }) {
   const [openSections, setOpenSections] = useState<Set<SopSectionId>>(
     () => new Set<SopSectionId>(['research-projects']),
   )
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(() => new Set())
   const [activeDrag, setActiveDrag] = useState<{ sectionId: SopSectionId; entryId: string } | null>(null)
   const [exportingPdf, setExportingPdf] = useState(false)
   const [message, setMessage] = useState('')
@@ -162,14 +163,16 @@ export function SopMaterialBankPage({ programs }: { programs: ProgramView[] }) {
       setMessage(`${definition.title} 最多建立 ${definition.maxItems} 條。`)
       return
     }
+    const entry = createMaterialEntry(definition)
     commit((current) => ({
       ...current,
       sections: {
         ...current.sections,
-        [definition.id]: [...current.sections[definition.id], createMaterialEntry(definition)],
+        [definition.id]: [...current.sections[definition.id], entry],
       },
     }))
     setOpenSections((current) => new Set(current).add(definition.id))
+    if (definition.id === 'research-projects') setExpandedProjects(new Set([entry.id]))
   }
 
   function deleteEntry(definition: MaterialSectionDefinition, entry: MaterialEntry, index: number) {
@@ -182,6 +185,20 @@ export function SopMaterialBankPage({ programs }: { programs: ProgramView[] }) {
         [definition.id]: current.sections[definition.id].filter((item) => item.id !== entry.id),
       },
     }))
+    setExpandedProjects((current) => {
+      const next = new Set(current)
+      next.delete(entry.id)
+      return next
+    })
+  }
+
+  function toggleProject(entryId: string) {
+    setExpandedProjects((current) => {
+      const next = new Set(current)
+      if (next.has(entryId)) next.delete(entryId)
+      else next.add(entryId)
+      return next
+    })
   }
 
   function handleDragStart(definition: MaterialSectionDefinition, event: DragStartEvent) {
@@ -350,6 +367,9 @@ export function SopMaterialBankPage({ programs }: { programs: ProgramView[] }) {
             entries={state.sections[definition.id]}
             progress={progress.sections[definition.id]}
             open={openSections.has(definition.id)}
+            expandedProjects={expandedProjects}
+            onToggleProject={toggleProject}
+            onExpandProjects={(expanded) => setExpandedProjects(new Set(expanded ? state.sections['research-projects'].map(entry => entry.id) : []))}
             activeEntry={activeDrag?.sectionId === definition.id ? activeEntry : null}
             sensors={sensors}
             programSuggestions={programSuggestions}
@@ -389,6 +409,9 @@ function MaterialSectionCard({
   entries,
   progress,
   open,
+  expandedProjects,
+  onToggleProject,
+  onExpandProjects,
   activeEntry,
   sensors,
   programSuggestions,
@@ -404,6 +427,9 @@ function MaterialSectionCard({
   entries: MaterialEntry[]
   progress: { total: number; answered: number; deferred: number; percent: number }
   open: boolean
+  expandedProjects: ReadonlySet<string>
+  onToggleProject: (entryId: string) => void
+  onExpandProjects: (expanded: boolean) => void
   activeEntry: MaterialEntry | null
   sensors: ReturnType<typeof useSensors>
   programSuggestions: string[]
@@ -418,6 +444,8 @@ function MaterialSectionCard({
   const complete = progress.percent === 100
   const started = progress.answered > 0 || progress.deferred > 0
   const canAdd = definition.repeatable && (!definition.maxItems || entries.length < definition.maxItems)
+  const collapsibleEntries = definition.id === 'research-projects'
+  const hasExpandedProjects = entries.some(entry => expandedProjects.has(entry.id))
 
   return (
     <article
@@ -457,18 +485,30 @@ function MaterialSectionCard({
         <div className="border-t border-stone-100 bg-stone-50/45 p-3 sm:p-5">
           <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <p className="max-w-3xl text-xs leading-5 text-stone-500">{definition.description}</p>
-            {definition.repeatable && (
-              <button
-                type="button"
-                onClick={onAdd}
-                disabled={!canAdd}
-                className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-xl bg-[#173f35] px-3.5 py-2.5 text-xs font-bold text-white hover:bg-[#205647] disabled:cursor-not-allowed disabled:bg-stone-300"
-              >
-                <Plus className="h-4 w-4" />
-                新增 {definition.itemLabel}
-                {definition.maxItems ? `（${entries.length}/${definition.maxItems}）` : ''}
-              </button>
-            )}
+            <div className="flex shrink-0 flex-wrap items-center gap-2">
+              {collapsibleEntries && (
+                <button
+                  type="button"
+                  onClick={() => onExpandProjects(!hasExpandedProjects)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-stone-200 bg-white px-3 py-2.5 text-xs font-bold text-stone-600 hover:border-emerald-300 hover:text-emerald-700"
+                >
+                  <ChevronDown className={classNames('h-4 w-4', hasExpandedProjects && 'rotate-180')} />
+                  {hasExpandedProjects ? '全部收合' : '全部展開'}
+                </button>
+              )}
+              {definition.repeatable && (
+                <button
+                  type="button"
+                  onClick={onAdd}
+                  disabled={!canAdd}
+                  className="inline-flex shrink-0 items-center justify-center gap-2 self-start rounded-xl bg-[#173f35] px-3.5 py-2.5 text-xs font-bold text-white hover:bg-[#205647] disabled:cursor-not-allowed disabled:bg-stone-300"
+                >
+                  <Plus className="h-4 w-4" />
+                  新增 {definition.itemLabel}
+                  {definition.maxItems ? `（${entries.length}/${definition.maxItems}）` : ''}
+                </button>
+              )}
+            </div>
           </div>
 
           <DndContext
@@ -486,6 +526,8 @@ function MaterialSectionCard({
                     definition={definition}
                     entry={entry}
                     index={index}
+                    expanded={!collapsibleEntries || expandedProjects.has(entry.id)}
+                    onToggle={collapsibleEntries ? () => onToggleProject(entry.id) : undefined}
                     canDelete={definition.repeatable && entries.length > 1}
                     programSuggestions={programSuggestions}
                     onDelete={() => onDelete(entry, index)}
@@ -517,6 +559,8 @@ function SortableMaterialEntry({
   definition,
   entry,
   index,
+  expanded,
+  onToggle,
   canDelete,
   programSuggestions,
   onDelete,
@@ -525,11 +569,14 @@ function SortableMaterialEntry({
   definition: MaterialSectionDefinition
   entry: MaterialEntry
   index: number
+  expanded: boolean
+  onToggle?: () => void
   canDelete: boolean
   programSuggestions: string[]
   onDelete: () => void
   onUpdate: (fieldId: string, update: Partial<MaterialAnswer>) => void
 }) {
+  const contentId = useId()
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: entry.id,
     disabled: !definition.repeatable,
@@ -550,7 +597,7 @@ function SortableMaterialEntry({
       )}
       data-testid={`sop-entry-${definition.id}-${index}`}
     >
-      <div className="flex items-center gap-3 border-b border-stone-100 bg-white px-3 py-3 sm:px-4">
+      <div className={classNames('flex items-center gap-3 bg-white px-3 py-3 sm:px-4', expanded && 'border-b border-stone-100')}>
         {definition.repeatable && (
           <button
             type="button"
@@ -562,10 +609,30 @@ function SortableMaterialEntry({
             <GripVertical className="h-4 w-4" />
           </button>
         )}
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-bold text-stone-800">{itemSummary(definition, entry, index)}</p>
-          <p className="mt-0.5 text-[10px] text-stone-400">{completed} 項已填寫 · {addressed} 項已檢視</p>
-        </div>
+        {onToggle ? (
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={expanded}
+            aria-controls={contentId}
+            aria-label={`${expanded ? '收合' : '展開'} ${itemSummary(definition, entry, index)}`}
+            className="flex min-w-0 flex-1 items-center gap-3 rounded-lg py-1 text-left hover:bg-stone-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-emerald-600"
+          >
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-bold text-stone-800">{itemSummary(definition, entry, index)}</span>
+              <span className="mt-0.5 block text-[10px] text-stone-400">{completed} / {definition.fields.length} 項已填寫 · {addressed} 項已檢視</span>
+            </span>
+            <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-stone-500">
+              {expanded ? '收合' : '展開'}
+              <ChevronDown className={classNames('h-4 w-4 transition-transform', expanded && 'rotate-180')} />
+            </span>
+          </button>
+        ) : (
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-bold text-stone-800">{itemSummary(definition, entry, index)}</p>
+            <p className="mt-0.5 text-[10px] text-stone-400">{completed} 項已填寫 · {addressed} 項已檢視</p>
+          </div>
+        )}
         {canDelete && (
           <button
             type="button"
@@ -578,18 +645,22 @@ function SortableMaterialEntry({
         )}
       </div>
 
-      <div className="grid gap-4 p-4 sm:p-5 xl:grid-cols-2">
-        {definition.fields.map((field) => (
-          <GuidedField
-            key={field.id}
-            definition={field}
-            answer={entry.answers[field.id]!}
-            list={definition.id === 'school-fit' && field.id === 'program' ? programSuggestions : undefined}
-            wide={field.type !== 'text' && field.type !== 'select'}
-            testId={`sop-${definition.id}-${index}-${field.id}`}
-            onChange={(update) => onUpdate(field.id, update)}
-          />
-        ))}
+      <div id={contentId} hidden={!expanded}>
+        {expanded && (
+          <div className="grid gap-4 p-4 sm:p-5 xl:grid-cols-2">
+            {definition.fields.map((field) => (
+              <GuidedField
+                key={field.id}
+                definition={field}
+                answer={entry.answers[field.id]!}
+                list={definition.id === 'school-fit' && field.id === 'program' ? programSuggestions : undefined}
+                wide={field.type !== 'text' && field.type !== 'select'}
+                testId={`sop-${definition.id}-${index}-${field.id}`}
+                onChange={(update) => onUpdate(field.id, update)}
+              />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )
