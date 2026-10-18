@@ -37,6 +37,9 @@
 .cloud-login-footer { margin-top: 24px; text-align: center; }
 .cloud-login-footer a { color: #a3abba; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
 .cloud-login-footer a:hover { color: #d9e5fb; }
+.cloud-login-footer > p { margin: 0 0 15px; color: #a3abba; font-size: 13px; }
+.cloud-login-footer .cloud-auth-toggle { display: inline; width: auto; min-height: 40px; margin: 0 0 0 5px; padding: 7px; background: none; color: #99baff; font-size: 13px; }
+.cloud-login-form .cloud-login-confirmation { margin: 16px 0 0; padding: 12px; border: 1px solid #3b665a; border-radius: 8px; background: #223b32; color: #c1e8d2; font-size: 13px; }
 .cloud-oauth-compact { max-width: 420px; }
 .cloud-oauth-compact .cloud-oauth-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
 .cloud-oauth-compact .cloud-provider { width: auto; flex: 1; min-height: 40px; padding: 8px 14px; white-space: nowrap; font-size: 12px; }

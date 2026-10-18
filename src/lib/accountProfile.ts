@@ -1,5 +1,5 @@
 import type { User } from '@supabase/supabase-js'
-import { cloud } from './cloudClient'
+import { captureAccountUser } from './accountUser'
 
 export const AVATAR_BUCKET = 'easier-avatars'
 export const LOCAL_PROFILE_KEY = 'easier-local-profile-v1'
@@ -50,13 +50,14 @@ export function blobDataUrl(blob: Blob): Promise<string> {
   })
 }
 export async function saveCloudProfile(user: User, name: string, avatar: AvatarChange): Promise<User> {
-  if (!cloud) throw new Error('尚未登入')
+  const account = await captureAccountUser(user.id)
   const previous = ownAvatarPath(user)
   const metadata: Record<string, string | boolean | null> = { easier_display_name: name.trim().slice(0, 80) }
   let uploaded = ''
   if (avatar.kind === 'upload') {
     uploaded = `${user.id}/${crypto.randomUUID()}.${avatar.blob.type === 'image/png' ? 'png' : 'webp'}`
-    const { error } = await cloud.storage.from(AVATAR_BUCKET).upload(uploaded, avatar.blob, { contentType: avatar.blob.type, upsert: false })
+    const { error } = await account.client.storage.from(AVATAR_BUCKET).upload(uploaded, avatar.blob, { contentType: avatar.blob.type, upsert: false })
+    account.assert()
     if (error) throw new Error('頭像上傳失敗，請重試')
     metadata.easier_avatar_path = uploaded
     metadata.easier_avatar_hidden = false
@@ -65,13 +66,13 @@ export async function saveCloudProfile(user: User, name: string, avatar: AvatarC
     metadata.easier_avatar_hidden = avatar.kind === 'remove'
   }
   try {
-    const { data, error } = await cloud.auth.updateUser({ data: metadata })
-    if (error) throw error
+    const updatedUser = await account.update({ data: metadata })
     // Replace only after the new profile is saved, so a failed request preserves the old photo.
-    if (previous && avatar.kind !== 'keep' && previous !== uploaded) await cloud.storage.from(AVATAR_BUCKET).remove([previous]).catch(() => undefined)
-    return data.user
+    if (previous && avatar.kind !== 'keep' && previous !== uploaded) await account.client.storage.from(AVATAR_BUCKET).remove([previous]).catch(() => undefined)
+    account.assert()
+    return updatedUser
   } catch {
-    if (uploaded) await cloud.storage.from(AVATAR_BUCKET).remove([uploaded]).catch(() => undefined)
+    if (uploaded) await account.client.storage.from(AVATAR_BUCKET).remove([uploaded]).catch(() => undefined)
     throw new Error('設定未儲存，請重試')
   }
 }

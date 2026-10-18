@@ -4,6 +4,8 @@ import { STORAGE_KEY, PRE_UPDATE_BACKUP_KEY, base64ToArrayBuffer, parseWorkbook,
 import { reconcileSchoolSelection } from './selection'
 import type { PersistedTracker } from '../types'
 import { createSharedShortlist, type SharedShortlist } from './sharedShortlist'
+import { assertCurrentAccount, currentAccountGuard } from './accountSession'
+import type { AccountCloud } from './accountCloud'
 
 export const SYNC_KEYS = [STORAGE_KEY, PRE_UPDATE_BACKUP_KEY, 'easier-application-notes-v2', 'easier-global-notes-v1', 'easier-sop-material-bank-v1', 'easier-comparison-v1'] as const
 export type CloudDocument = Omit<ApplicationDocument, 'blob'> & { path?: string; mime?: string }
@@ -20,6 +22,15 @@ const BASELINE_KEY = 'easier-cloud-baseline-v1'
 const blobCache = new Map<string, { path: string; blob: Blob }>()
 const uploaded = new Set<string>()
 let excelCache: { source: string; path: string; blob: Blob; shortlist: SharedShortlist } | undefined
+export function resetCloudSnapshotCaches() { blobCache.clear(); uploaded.clear(); excelCache = undefined }
+function requestClient(context?: AccountCloud, userId?: string) {
+  assertCurrentAccount(userId)
+  context?.assert()
+  if (context && userId && context.userId !== userId) throw new Error('雲端請求的帳號不符。')
+  const client = context?.client ?? cloud
+  if (!client) throw new Error('尚未連接雲端')
+  return client
+}
 export async function readBaseline(): Promise<Baseline | null> {
   try {
     const value = JSON.parse(localStorage.getItem(BASELINE_KEY) || 'null') as Baseline | null
@@ -35,7 +46,7 @@ export async function readBaseline(): Promise<Baseline | null> {
     return value
   } catch { return null }
 }
-export function writeBaseline(value: Baseline) { localStorage.setItem(BASELINE_KEY, JSON.stringify(value)) }
+export function writeBaseline(value: Baseline) { assertCurrentAccount(value.userId); localStorage.setItem(BASELINE_KEY, JSON.stringify(value)) }
 function stable(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stable)
   if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).sort(([a], [b]) => a.localeCompare(b)).map(([k, v]) => [k, stable(v)]))
@@ -65,6 +76,7 @@ async function hash(blob: Blob) {
   return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('')
 }
 export async function captureSnapshot(userId: string): Promise<{ snapshot: Snapshot; files: Map<string, Blob> }> {
+  assertCurrentAccount(userId)
   const values: Record<string, string> = {}
   for (const key of SYNC_KEYS) {
     const value = localStorage.getItem(key)
@@ -82,9 +94,11 @@ export async function captureSnapshot(userId: string): Promise<{ snapshot: Snaps
       documents.push({ ...doc, path: cached.path, mime: blob.type })
     } else documents.push(doc)
   }
+  assertCurrentAccount(userId)
   return { snapshot: { format: 'easier-cloud-v1', values, documents }, files }
 }
 export async function addExcelExport(userId: string, snapshot: Snapshot, files: Map<string, Blob>) {
+  assertCurrentAccount(userId)
   const raw = snapshot.values[STORAGE_KEY]
   if (!raw) return
   const tracker = JSON.parse(raw) as PersistedTracker
@@ -96,27 +110,37 @@ export async function addExcelExport(userId: string, snapshot: Snapshot, files: 
     const blob = new Blob([createExportWorkbook(model.workbook, programs, selection)], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' })
     excelCache = { source, path: `${userId}/exports/${await hash(blob)}.xlsx`, blob, shortlist: createSharedShortlist(programs, selection) }
   }
+  assertCurrentAccount(userId)
   snapshot.workbookPath = excelCache.path
   snapshot.shortlist = excelCache.shortlist
   files.set(excelCache.path, excelCache.blob)
 }
-export async function readCloud(userId: string): Promise<CloudRow | null> {
-  const { data, error } = await cloud!.from('easier_workspaces').select('revision,payload,updated_at').eq('user_id', userId).maybeSingle()
+export async function readCloud(userId: string, context?: AccountCloud): Promise<CloudRow | null> {
+  const { data, error } = await requestClient(context, userId).from('easier_workspaces').select('revision,payload,updated_at').eq('user_id', userId).maybeSingle()
+  requestClient(context, userId)
   if (error) throw new Error(error.message)
   return data as CloudRow | null
 }
-export async function pushCloud(snapshot: Snapshot, files: Map<string, Blob>, expectedRevision: number): Promise<number> {
+export async function pushCloud(snapshot: Snapshot, files: Map<string, Blob>, expectedRevision: number, context?: AccountCloud): Promise<number> {
+  const client = requestClient(context, context?.userId)
   for (const [path, blob] of files) {
+    requestClient(context, context?.userId)
+    if (context && !path.startsWith(`${context.userId}/`)) throw new Error('檔案所屬帳號不符。')
     if (uploaded.has(path)) continue
-    const { error } = await cloud!.storage.from(CLOUD_BUCKET).upload(path, blob, { upsert: false, contentType: blob.type || 'application/octet-stream' })
+    const { error } = await client.storage.from(CLOUD_BUCKET).upload(path, blob, { upsert: false, contentType: blob.type || 'application/octet-stream' })
+    requestClient(context, context?.userId)
     if (error && !['409', 'Duplicate'].includes(String(error.statusCode)) && !/already exists|duplicate/i.test(error.message)) throw new Error(`檔案上傳失敗：${error.message}`)
     uploaded.add(path)
   }
-  const { data, error } = await cloud!.rpc('save_easier_workspace', { expected_revision: expectedRevision, next_payload: snapshot })
+  requestClient(context, context?.userId)
+  const { data, error } = await client.rpc('save_easier_workspace', { expected_revision: expectedRevision, next_payload: snapshot })
+  requestClient(context, context?.userId)
   if (error) throw new Error(error.code === 'PT409' ? 'SYNC_CONFLICT' : error.message)
   return Number(data)
 }
-export async function applySnapshot(snapshot: Snapshot, userId: string) {
+export async function applySnapshot(snapshot: Snapshot, userId: string, context?: AccountCloud) {
+  assertCurrentAccount(userId)
+  context?.assert()
   if (snapshot.format !== 'easier-cloud-v1' || !snapshot.values || !Array.isArray(snapshot.documents)) throw new Error('雲端備份格式錯誤')
   // Validate and download every file before touching the local copy.
   if (snapshot.values[STORAGE_KEY]) {
@@ -129,12 +153,14 @@ export async function applySnapshot(snapshot: Snapshot, userId: string) {
     let blob: Blob | undefined
     if (path) {
       if (!path.startsWith(`${userId}/`)) throw new Error('文件所屬帳號不符')
-      const { data, error } = await cloud!.storage.from(CLOUD_BUCKET).download(path)
+      const { data, error } = await requestClient(context, userId).storage.from(CLOUD_BUCKET).download(path)
+      requestClient(context, userId)
       if (error) throw new Error(`文件下載失敗：${error.message}`)
       blob = data.slice(0, data.size, mime || data.type)
     }
     documents.push({ ...doc, blob })
   }
+  assertCurrentAccount(userId); context?.assert()
   const before = SYNC_KEYS.map((key) => [key, localStorage.getItem(key)] as const)
   try {
     for (const key of SYNC_KEYS) {
@@ -142,29 +168,39 @@ export async function applySnapshot(snapshot: Snapshot, userId: string) {
       else localStorage.removeItem(key)
     }
     await replaceDocuments(documents)
+    assertCurrentAccount(userId); context?.assert()
     blobCache.clear(); excelCache = undefined
   } catch (error) {
+    assertCurrentAccount(userId); context?.assert()
     for (const [key, value] of before) { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value) }
     throw error
   }
 }
 export async function exportFullBackup() {
+  const guard = currentAccountGuard()
+  guard?.assert()
   const values: Record<string, string> = {}
   for (const key of SYNC_KEYS) { const value = localStorage.getItem(key); if (value !== null) values[key] = value }
   const documents = JSON.parse(await serializeDocuments(await readDocuments()))
+  guard?.assert()
   downloadBlob(new Blob([JSON.stringify({ format: 'easier-full-backup', version: 1, values, documents })], { type: 'application/json' }), `Easier-full-backup-${new Date().toISOString().slice(0, 10)}.json`)
 }
-export async function downloadCloudExcel(userId: string) {
-  const row = await readCloud(userId)
+export async function downloadCloudExcel(userId: string, context?: AccountCloud) {
+  const row = await readCloud(userId, context)
   if (!row?.payload.workbookPath) throw new Error('尚未產生雲端 Excel，請先等候同步完成')
-  const { data, error } = await cloud!.storage.from(CLOUD_BUCKET).download(row.payload.workbookPath)
+  if (!row.payload.workbookPath.startsWith(`${userId}/`)) throw new Error('雲端 Excel 所屬帳號不符。')
+  const { data, error } = await requestClient(context, userId).storage.from(CLOUD_BUCKET).download(row.payload.workbookPath)
+  requestClient(context, userId)
   if (error) throw new Error(error.message)
   downloadBlob(data, 'Easier_latest.xlsx')
 }
 
 export async function importFullBackup(file: File) {
+  const guard = currentAccountGuard()
+  guard?.assert()
   if (file.size > 200 * 1024 * 1024) throw new Error('完整備份上限為 200 MB')
   const backup = JSON.parse(await file.text())
+  guard?.assert()
   if (backup?.format !== 'easier-full-backup' || backup.version !== 1 || !backup.values || typeof backup.values !== 'object') throw new Error('請選擇 Easier 完整備份')
   const documents = parseDocumentsBackup(backup.documents, true)
   const values: Record<string, string> = {}
@@ -182,8 +218,10 @@ export async function importFullBackup(file: File) {
   try {
     for (const key of SYNC_KEYS) { if (values[key] !== undefined) localStorage.setItem(key, values[key]); else localStorage.removeItem(key) }
     await replaceDocuments(documents)
+    guard?.assert()
     blobCache.clear(); excelCache = undefined
   } catch (error) {
+    guard?.assert()
     for (const [key, value] of before) { if (value === null) localStorage.removeItem(key); else localStorage.setItem(key, value) }
     throw error
   }

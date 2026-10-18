@@ -1,3 +1,5 @@
+import { currentAccountGuard } from './accountSession'
+
 export const DOCUMENT_CATEGORIES = ['CV', 'SOP', 'LoR', '成績單', '語言與考試', '作品與研究', '其他'] as const
 export type DocumentCategory = typeof DOCUMENT_CATEGORIES[number]
 export const DOCUMENT_STAGES = ['草稿', '待審閱', '定稿'] as const
@@ -39,23 +41,33 @@ function openDatabase(): Promise<IDBDatabase> {
 }
 
 export async function readDocuments(): Promise<ApplicationDocument[]> {
+  const guard = currentAccountGuard()
+  guard?.assert()
   const db = await openDatabase()
+  try { guard?.assert() } catch (error) { db.close(); throw error }
   return new Promise((resolve, reject) => {
     const transaction = db.transaction(STORE, 'readonly')
     const request = transaction.objectStore(STORE).getAll()
-    transaction.oncomplete = () => { db.close(); resolve(request.result as ApplicationDocument[]) }
+    transaction.oncomplete = () => { db.close(); try { guard?.assert(); resolve(request.result as ApplicationDocument[]) } catch (error) { reject(error) } }
     transaction.onabort = () => { db.close(); reject(new Error('無法讀取文件庫，請重新整理後重試。')) }
   })
 }
 
 export async function saveDocuments(documents: ApplicationDocument[], replace = false) {
+  const guard = currentAccountGuard()
+  guard?.assert()
   const db = await openDatabase()
+  try { guard?.assert() } catch (error) { db.close(); throw error }
   return new Promise<void>((resolve, reject) => {
     const transaction = db.transaction(STORE, 'readwrite')
-    if (replace) transaction.objectStore(STORE).clear()
-    for (const document of documents) transaction.objectStore(STORE).put(document)
-    transaction.oncomplete = () => { db.close(); if (typeof window !== 'undefined') window.dispatchEvent(new Event('easier-local-change')); resolve() }
-    transaction.onabort = () => { db.close(); reject(new Error('文件未儲存：瀏覽器空間不足或儲存被中斷。請先備份，再重試。')) }
+    const cancel = () => { try { transaction.abort() } catch { /* Already committed; it still belongs to the old account bank. */ } }
+    guard?.signal.addEventListener('abort', cancel, { once: true })
+    transaction.oncomplete = () => { guard?.signal.removeEventListener('abort', cancel); db.close(); try { guard?.assert(); if (typeof window !== 'undefined') window.dispatchEvent(new Event('easier-local-change')); resolve() } catch (error) { reject(error) } }
+    transaction.onabort = () => { guard?.signal.removeEventListener('abort', cancel); db.close(); reject(new Error('文件未儲存：瀏覽器空間不足或帳號已切換。請先備份，再重試。')) }
+    try {
+      if (replace) transaction.objectStore(STORE).clear()
+      for (const document of documents) transaction.objectStore(STORE).put(document)
+    } catch { transaction.abort() }
   })
 }
 
@@ -82,12 +94,19 @@ export async function serializeDocuments(documents: ApplicationDocument[]) {
 }
 
 export async function exportDocuments(documents: ApplicationDocument[]) {
-  downloadBlob(new Blob([await serializeDocuments(documents)], { type: 'application/json' }), `Easier-documents-${new Date().toISOString().slice(0, 10)}.json`)
+  const guard = currentAccountGuard()
+  guard?.assert()
+  const serialized = await serializeDocuments(documents)
+  guard?.assert()
+  downloadBlob(new Blob([serialized], { type: 'application/json' }), `Easier-documents-${new Date().toISOString().slice(0, 10)}.json`)
 }
 
 export async function importDocuments(file: File): Promise<ApplicationDocument[]> {
+  const guard = currentAccountGuard()
+  guard?.assert()
   if (file.size > 200 * 1024 * 1024) throw new Error('備份過大，請使用小於 200 MB 的文件庫備份。')
   const documents = parseDocumentsBackup(JSON.parse(await file.text()))
+  guard?.assert()
   await saveDocuments(documents)
   return documents
 }

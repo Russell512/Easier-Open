@@ -1,4 +1,4 @@
-import { ArrowRight, ArrowUpRight, CalendarDays, CheckCircle2, Clock3, Files, GraduationCap, ListChecks } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, CalendarDays, CheckCircle2, Clock3, Files, GraduationCap, ListChecks, Plus } from 'lucide-react'
 import type { AppTab, ProgramView, SchoolSelectionState, WorkbookModel } from '../../types'
 import type { DocumentsController } from '../../hooks/useDocuments'
 import { getValue, isChecklistDone, makeProgramKey, formatDate } from '../../lib/workbook'
@@ -6,7 +6,7 @@ import { statusLabel } from '../../lib/status'
 import { PageHeading, Panel, SchoolIcon } from './shared'
 import { dateNumber, dateText, fieldText } from './helpers'
 
-export function OverviewPage({ programs, model, selection, library, onOpen, onNavigate }: { programs: ProgramView[]; model: WorkbookModel; selection: SchoolSelectionState; library: DocumentsController; onOpen: (id: string) => void; onNavigate: (tab: AppTab) => void }) {
+export function OverviewPage({ programs, model, selection, library, onOpen, onNavigate, onAddPrograms }: { programs: ProgramView[]; model: WorkbookModel; selection: SchoolSelectionState; library: DocumentsController; onOpen: (id: string) => void; onNavigate: (tab: AppTab) => void; onAddPrograms: () => void }) {
   const active = programs.filter((program) => !['Rejected', 'Withdrawn'].includes(program.status) && selection.results?.[program.id] !== '淘汰')
   const ranked = [...active].sort((a, b) => { const rank = (id: string) => { const index = selection.rankingOrder.indexOf(id); return index < 0 ? Infinity : index }; return rank(a.id) - rank(b.id) }).slice(0, 4)
   const now = new Date(); now.setHours(0, 0, 0, 0)
@@ -21,6 +21,7 @@ export function OverviewPage({ programs, model, selection, library, onOpen, onNa
     { label: '未來 14 天的任務', value: upcoming.length, unit: '項', detail: `${overdue.length} 項已超過個人目標日`, icon: CalendarDays, tab: 'programs' as const, tone: 'amber' },
     { label: '我的申請文件', value: files.length, unit: '份', detail: `${files.filter((doc) => doc.stage === '定稿').length} 份定稿 · 含檔案與連結`, icon: Files, tab: 'documents' as const, tone: 'purple' },
   ]
+  if (!programs.length) return <section><PageHeading title="工作台" description="你的申請規劃，從這裡開始。" /><div className="wb-panel wb-empty"><GraduationCap size={40} /><h3>建立你的學程清單</h3><p>先新增一個感興趣的學程，或用 CSV 一次匯入清單。接著就能比較選校、整理筆記與追蹤申請進度。</p><button className="wb-button primary" onClick={onAddPrograms}><Plus size={16} />新增學程</button></div><p className="wb-footnote">也可以先從左側「我的文件」或「完整筆記」開始整理。</p></section>
   return <section>
     <PageHeading title="工作台" actions={<><span className="wb-today">{new Intl.DateTimeFormat('zh-TW', { month: 'long', day: 'numeric', weekday: 'short' }).format(now)}</span><button className="wb-button primary" onClick={() => onNavigate('programs')}>瀏覽學程<ArrowRight size={15} /></button></>} />
     <div className="wb-metrics">{metrics.map(({ label, value, unit, detail, icon: Icon, tab, tone }) => <button className={`wb-metric ${tone}`} onClick={() => onNavigate(tab)} key={label}><span className="wb-metric-label">{label}<Icon size={17} /></span><strong>{value}<small>{unit}</small></strong><span>{detail}<ArrowUpRight size={13} /></span></button>)}</div>

@@ -4,6 +4,7 @@ import { Check, Cloud, CloudOff, Download, FileSpreadsheet, KeyRound, LoaderCirc
 import type { User } from '@supabase/supabase-js'
 import { useWorkspaceAccount } from '../lib/workspaceAccount'
 import { cloud } from '../lib/cloudClient'
+import { updateAccountUser } from '../lib/accountUser'
 import { AVATAR_BUCKET, LOCAL_PROFILE_KEY, blobDataUrl, googleAvatar, ownAvatarPath, prepareAvatar, profileName, readLocalProfile, saveCloudProfile, type AvatarChange, type LocalProfile } from '../lib/accountProfile'
 import './accountMenu.css'
 
@@ -99,7 +100,7 @@ export function AccountMenu() {
       <button role="menuitem" tabIndex={-1} onClick={() => { close(); setSettings('profile') }}><Settings size={16} />設定</button>
       <div className="account-menu-divider" role="separator" />
       {!account.local && <button role="menuitem" tabIndex={-1} disabled={disabled || !account.ready || account.conflict || account.remoteChanged} onClick={() => void action(account.sync)}><RefreshCw size={16} />立即同步</button>}
-      <button role="menuitem" tabIndex={-1} disabled={disabled} onClick={() => void action(account.backup)}><Download size={16} />完整備份</button>
+      <button role="menuitem" tabIndex={-1} disabled={disabled || (!account.local && !account.ready && !account.conflict && !account.remoteChanged)} onClick={() => void action(account.backup)}><Download size={16} />完整備份</button>
       <button role="menuitem" tabIndex={-1} disabled={disabled || (!account.local && (!account.ready || account.conflict || account.remoteChanged))} onClick={() => { account.importBackup(); close(true) }}><Upload size={16} />匯入完整備份</button>
       {!account.local && <button role="menuitem" tabIndex={-1} disabled={disabled || !account.ready} onClick={() => void action(account.downloadExcel)}><FileSpreadsheet size={16} />雲端 Excel</button>}
       {(account.conflict || account.remoteChanged) && <button role="menuitem" tabIndex={-1} disabled={disabled} onClick={() => void action(account.loadCloud)}><RefreshCw size={16} />備份本機並載入雲端</button>}
@@ -136,8 +137,8 @@ function AccountSettings({ mode, user, name, avatar, local, onLocalChange, onClo
     try {
       if (mode === 'password') {
         if (password !== confirmation) throw new Error('兩次密碼不一致')
-        const { error } = await cloud!.auth.updateUser({ password })
-        if (error) throw new Error('密碼未更新，請重試；若系統要求驗證，請重新登入後再操作')
+        if (!user) throw new Error('請先登入後再修改密碼')
+        await updateAccountUser(user.id, { password })
         setPassword(''); setConfirmation(''); setSaved(true)
       } else {
         if (user) await saveCloudProfile(user, draftName, change)

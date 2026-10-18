@@ -218,15 +218,19 @@ function summarizeSheets(workbook: XLSX.WorkBook): SheetSummary[] {
   })
 }
 
-function missingFields(rows: DataRow[], sheet: string, fields: string[]): string[] {
-  if (!rows.length) return [`缺少或無法解析 sheet：${sheet}`]
+function missingFields(rows: DataRow[], sheet: string, fields: string[], templateHeaders?: string[]): string[] {
+  if (!rows.length && !templateHeaders) return [`缺少或無法解析 sheet：${sheet}`]
+  const present = rows[0]?.values ?? Object.fromEntries((templateHeaders ?? []).map(header => [header, null]))
   return fields
-    .filter((field) => !(field in rows[0]!.values))
+    .filter((field) => !(field in present))
     .map((field) => `${sheet} 缺少欄位「${field}」`)
 }
 
 function collectWarnings(workbook: XLSX.WorkBook, data: Record<string, DataRow[]>): string[] {
   const warnings: string[] = []
+  const template = workbook.Sheets['Easier Template']?.A2?.v
+  const summaries = ['easier-empty-v1', 'easier-demo-v1'].includes(String(template)) ? summarizeSheets(workbook) : []
+  const templateHeaders = (name: string) => summaries.find(sheet => sheet.name === name)?.headers
   MAIN_SHEETS.forEach((sheet) => {
     if (!workbook.SheetNames.includes(sheet)) warnings.push(`Workbook 缺少必要 sheet「${sheet}」`)
   })
@@ -239,15 +243,15 @@ function collectWarnings(workbook: XLSX.WorkBook, data: Record<string, DataRow[]
       'Application Status',
       'Research Fit Score',
       'Next Action',
-    ]),
-    ...missingFields(data.Faculty ?? [], 'Faculty', ['University', 'Program', 'Faculty Name']),
+    ], templateHeaders('Programs')),
+    ...missingFields(data.Faculty ?? [], 'Faculty', ['University', 'Program', 'Faculty Name'], templateHeaders('Faculty')),
     ...missingFields(data['Application Checklist'] ?? [], 'Application Checklist', [
       'University',
       'Program',
-    ]),
+    ], templateHeaders('Application Checklist')),
   )
 
-  const faculty = data.Faculty?.[0]?.values ?? {}
+  const faculty = data.Faculty?.[0]?.values ?? Object.fromEntries((templateHeaders('Faculty') ?? []).map(header => [header, null]))
   ;['Last Verified Date'].forEach((field) => {
     if (!(field in faculty)) warnings.push(`Faculty 沒有獨立「${field}」欄；相關資訊僅在現有欄位中顯示。`)
   })

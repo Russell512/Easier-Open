@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict'
 import fs from 'node:fs/promises'
-import ts from 'typescript'
+import { build } from 'esbuild'
 import 'fake-indexeddb/auto'
 
 // The production module is tested unchanged with the IndexedDB implementation
 // used for Node-based browser-storage tests. No real browser data is accessed.
-const source = await fs.readFile(new URL('../src/lib/documents.ts', import.meta.url), 'utf8')
-const code = ts.transpileModule(source, { compilerOptions: { module: ts.ModuleKind.ESNext, target: ts.ScriptTarget.ES2022 } }).outputText
-const { safeWebUrl, saveDocuments, readDocuments, importDocuments, serializeDocuments } = await import(`data:text/javascript;base64,${Buffer.from(code).toString('base64')}`)
+await fs.mkdir(new URL('../.local', import.meta.url), { recursive: true })
+await build({ entryPoints: ['src/lib/documents.ts'], bundle: true, platform: 'node', format: 'esm', outfile: '.local/documents-test.mjs' })
+const { safeWebUrl, saveDocuments, readDocuments, importDocuments, serializeDocuments } = await import('../.local/documents-test.mjs')
 
 // Node has Blob/File but not FileReader; reproduce the standard readAsDataURL
 // boundary so backup bytes can be checked independently against the input.

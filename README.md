@@ -23,6 +23,7 @@ Easier 是免費、開源的學程研究與申請管理工具：整理選校結�
 - **材料與文件**：追蹤 CV、SOP、成績單、考試、推薦信；保留文件版本及適用學程。加入文件不代表已提交申請。
 - **Excel 與備份**：匯入／匯出 `.xlsx`、匯出學程 `.csv`，完整備份包含筆記與文件。
 - **帳號選單與頭像**：點右上角頭像開啟設定，上傳照片或使用 Google 頭像。同步、完整備份、匯入、雲端 Excel、修改密碼與登出集中於此；同步狀態顯示在底部。
+- **每個帳號各自的工作區**：雲端使用者可透過 Google 登入，新帳號從空白學程清單開始。既有 Email 帳號也可登入；Email 註冊須由站方配置寄信服務後啟用。學程、筆記、文件、版本歷史與分享設定彼此隔離，不需要站方手動配發 Excel。
 - **選用雲端同步**：使用自己的 Supabase，登入後同步變更，版本衝突時保留兩邊資料供選擇。
 
 ## 5 分鐘開始
@@ -36,7 +37,7 @@ npm ci
 npm run dev
 ```
 
-打開終端顯示的網址（通常 `http://localhost:5173`）。**不用登入，也不用設定環境變數。**
+打開終端顯示的網址（通常 `http://localhost:5173`）。開發模式未設定 Supabase 時會使用本機範例，**不用登入或設定帳號**。若已有雲端設定，仍可用 `VITE_LOCAL_MODE=true npm run dev` 明確切回本機模式。正式部署請選擇 `build:local`，或完成雲端設定後使用 `build:cloud`；正式雲端版不會因缺少設定而改讀公開 Excel。
 
 1. 從「選校結果」試著拖拉示範卡片，或使用卡片上的選單。
 2. 按側欄 Notes 的 `+`，在右側記錄想法。
@@ -71,6 +72,8 @@ npm run dev
 
 本機模式清除網站資料、換瀏覽器或換網址不會自動帶走資料。請定期點右上角頭像 →「完整備份」。分頁布局是各裝置自己的偏好；筆記內容則會跟著工作區同步。不是電腦資料夾背景同步，也不會把每次修改推到 GitHub。
 
+雲端模式會按帳號保留各自的本機副本，包括尚未同步的修改與文件。切換帳號先封存原帳號，再載入目前帳號自己的內容；重新登入原帳號可恢復其副本。舊版資料若無法確認帳號歸屬，會隔離保留並提示，不會自動匯入下一個登入者的工作區。這些瀏覽器副本不是雲端權限的替代；在共用裝置上，請登出並視需要清除網站資料，清除前先備份尚未同步的內容。
+
 ## 建置與部署
 
 ### 免帳號的靜態版本
@@ -87,19 +90,19 @@ npm run preview
 ### 使用自己的 Supabase（選用）
 
 1. 建立 Supabase 專案，按檔名順序執行 `supabase/migrations/` 的 SQL，建立工作區、版本歷史、私人 storage bucket 與 RLS。
-2. 在 Authentication 建立自己的 email/password 使用者，並在 SQL Editor 執行 `insert into public.easier_workspace_owners(user_id) values ('你的使用者 UUID');`。只有名單中的帳號可以編輯；其他登入者只能透過分享連結查看。
-3. 在 Storage 的私人 `easier-private` bucket，把起始 Excel 上傳到 `<使用者 UUID>/seed/update_info.xlsx`。每位擁有者各自需要一份 seed。
+2. 包含 `202610190001_self_service_workspaces.sql`：已驗證且非匿名的帳號首次登入時，會透過 `easier_ensure_workspace_access` 取得自己的工作區。無須手動插入 owner row；RLS、私人檔案路徑與分享資料仍限制為本人。
+3. 設定 Google provider 與正式 Site URL／Redirect URLs，即可讓新使用者登入自己的空白工作區。Email 註冊預設關閉；要開放時，先配置並實測自訂 SMTP 與確認信，再於部署環境設定 `VITE_EMAIL_SIGNUP_ENABLED=true` 並重新建置。使用者須依提示完成確認，未取得 session 前不開啟工作區。新帳號不需要 seed；已有 `<使用者 UUID>/seed/update_info.xlsx` 的帳號沿用自己的 seed，不會複製給其他人。
 4. 複製 `.env.example` 為 `.env.local`，填入你自己的 Supabase URL 與 **publishable / anon client key**。把 `VITE_LOCAL_MODE` 設為 `false`。**不要使用 `service_role` 金鑰**。
-5. 部署環境也設定相同變數，將 Vercel 的 Build Command 改為 `npm run build:cloud`。`build:cloud` 會移除 `dist/data`，雲端 seed 改由登入後私下取得。
+5. 部署環境也設定相同變數，將 Vercel 的 Build Command 改為 `npm run build:cloud`。`build:cloud` 會移除 `dist/data`；雲端不會回退讀取公開 Excel。私人 seed 僅在明確不存在（404）時改用空白範本，權限與網路錯誤會保留為錯誤。
 6. 先用測試帳號確認登入、編輯、重新登入与完整備份，再搬入自己的資料。
 
 不要把 `.env.local`、資料庫備份或私人 Excel 提交進公開 repo。同步會檢查 revision；遇到兩台裝置同時修改，先备份再選擇版本。一次只允許同一瀏覽器一個分頁編輯雲端工作區，應用程式內的四欄不受此限制。
 
-### Google 登入與唯讀分享
+### 登入與唯讀分享
 
-登入頁含 Easier 標誌、Google／Apple 圖示及 Email 表單。Apple 網頁登入的 Developer 帳號、Services ID、callback 和憑證設定請見 [Apple 登入設定](docs/apple-sign-in.md)。未啟用時按鈕會說明狀態；完成 Supabase 設定後重新載入即可使用。
+登入頁含 Easier 標誌、Google／Apple 圖示及既有 Email 帳號登入。原站目前開放 Google 新帳號，Email 註冊因尚未配置自訂 SMTP 而維持關閉。Apple 需要具備 Apple Developer Program 權限的團隊、Services ID 與簽名憑證；一般 Apple Developer 註冊不足以啟用網頁登入。原站目前維持 Apple 停用，按鈕會說明狀態。自行部署的設定請見 [Apple 登入設定](docs/apple-sign-in.md)，完成後先測試再啟用。
 
-依 [Supabase Google 登入文件](https://supabase.com/docs/guides/auth/social-login/auth-google)，在 Google Auth Platform 建立 Web OAuth 用戶端，將 Supabase 的 `/auth/v1/callback` 加到 Authorized redirect URIs，再把 Client ID / Secret 填入 Supabase 的 Google provider。Secret 只放在 Supabase，不可放進 `VITE_*`。在 Supabase URL Configuration 設定網站網址與允許的回跳網址。同一個已驗證 Email 的 Google 身分會連接到原有帳號；編輯權限依資料庫的使用者 UUID 判斷。
+依 [Supabase Google 登入文件](https://supabase.com/docs/guides/auth/social-login/auth-google)，在 Google Auth Platform 建立 Web OAuth 用戶端，將 Supabase 的 `/auth/v1/callback` 加到 Authorized redirect URIs，再把 Client ID / Secret 填入 Supabase 的 Google provider。Secret 只放在 Supabase，不可放進 `VITE_*`。在 Supabase URL Configuration 設定網站網址與允許的回跳網址。工作區依 Supabase 驗證後的使用者 UUID 歸屬，不依顯示名稱合併；若用不同登入方式進入不同帳號，各自擁有獨立資料。
 
 Google 品牌設定需填寫實際網站首頁與隱私權說明。部署前請按你的服務設定修改 `public/privacy.html` 與聯絡方式，並在 Google Auth Platform 將目標對象設為正式發布。只需基本 `openid`、Email 與個人資料範圍，無須 Gmail 或 Drive 權限。Supabase Redirect URLs 可使用你的正式網站 `https://你的網域/**`，讓登入後保留分享連結；不要允許不受你控制的網域。
 
@@ -118,6 +121,9 @@ npm run test:sharing
 npm run test:notes
 npm run test:program-import
 npm run test:auth
+npm run test:starter
+npm run test:accounts
+npm run test:account-user
 npm run test:documents
 npm run test:autosync
 npm run test:demo

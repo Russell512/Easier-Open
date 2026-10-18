@@ -2,11 +2,11 @@
 
 Easier 的工作區與分享頁已接上 Supabase 的 Apple OAuth 流程。登入頁會讀取 Supabase Auth 的公開 `/auth/v1/settings`：只有 `external.apple` 為 `true` 才能按下 Apple 登入。未啟用時顯示「Apple 登入尚未啟用」；讀取失敗時保留 Google 與 Email 登入。啟用後重新整理網頁即可，不需要重新部署前端。
 
-2026-10-19 以公開設定端點唯讀確認：目前專案 Google、Email 已啟用，Apple 尚未啟用。這只能確認 provider 開關，不能證明 Apple 憑證是否已準備好。本次前端修改沒有變更正式環境的登入設定或資料權限。
+2026-10-19：原站目前開放 Google 登入與既有 Email 帳號登入；Email 註冊須待自訂 SMTP 配置完成才啟用。Apple 保持停用：站方已確認只有一般 Apple Developer 帳號，尚未加入 Apple Developer Program，沒有本次啟用所需的 Services ID／簽名憑證；不應把「已註冊 Developer」當成已具備會員資源。一般註冊與 Program 會員可用資源的差異見 [Apple 開發者帳號說明](https://developer.apple.com/help/account/basics/about-your-developer-account)。登入按鈕與 OAuth 程式已備妥，但尚未完成真實 Apple 登入驗證。
 
 ## 站方需要完成的設定
 
-1. 準備可使用 Sign in with Apple 的 Apple Developer 帳號，建立或選擇已開啟該能力的主要 App ID。
+1. 先具備 Apple Developer Program 團隊的相應權限，再建立或選擇已開啟 Sign in with Apple 的主要 App ID。只有免費開發者註冊時，保留停用，待站方決定加入 Program 或取得合適團隊權限後再設定。
 2. 在 Apple Developer 的 Certificates, Identifiers & Profiles 建立 **Services ID**，並將 Sign in with Apple 連到主要 App ID。
 3. 在該 Services ID 的 Website URLs 設定 Supabase 專案網域 `<project-ref>.supabase.co`，Return URL 設為 `https://<project-ref>.supabase.co/auth/v1/callback`。若使用 Supabase 自訂網域，改用 Dashboard 顯示的 callback。
 4. 建立 Sign in with Apple signing key，安全保存 `.p8`，並準備 Team ID、Key ID、Services ID，以產生 Apple client secret。
@@ -18,9 +18,11 @@ Apple OAuth client secret 最長六個月到期。請在到期前重新產生並
 
 ## 帳號與既有資料
 
-Apple 登入只負責驗證身分，沒有放寬工作區權限。工作區仍由 `easier_can_edit_workspace` 與資料庫規則決定是否允許編輯；其他已登入者只能透過分享連結查看擁有者開放的內容。
+每位完成驗證且非匿名的使用者都有自己的獨立工作區。首次登入由 `easier_ensure_workspace_access` 以目前使用者 UUID 初始化權限；`easier_can_edit_workspace`、資料庫與私人檔案規則仍限制為本人。新帳號從零學程開始，不需要手動加入名單或複製原擁有者 seed；已有帳號的工作區、歷史、文件與分享保持原樣。
 
-Apple 的隱藏 Email 可能產生不同身分。請先確認登入帳號對應，再由站方按既有流程授權；不要自動把任何 Apple 帳號當成工作區擁有者，也不要依姓名合併私人資料。
+Apple 的隱藏 Email 可能產生不同帳號。工作區依驗證後的 UUID 決定歸屬，不依姓名或未驗證的 Email 合併。若未來 Apple 登入建立了另一個帳號，它會得到自己的空白工作區，不會接收原帳號的私人資料；需要搬移時應先確認帳號，再明確匯入本人備份。
+
+同一瀏覽器切換帳號時，各帳號的本機工作區會分別封存與恢復；無法確認擁有者的舊資料隔離保留，不會自動交給下一個登入者。Email 註冊預設關閉；自訂 SMTP 與確認流程驗證完成後，才可設定 `VITE_EMAIL_SIGNUP_ENABLED=true` 並重新建置。啟用後若尚未取得 session，只顯示查收確認信提示，不建立可編輯工作區。
 
 ## 驗證
 

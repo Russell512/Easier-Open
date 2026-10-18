@@ -1,5 +1,5 @@
 import { fetchDefaultWorkbook, saveLocalValue } from './lib/cloudClient'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, FileSpreadsheet, X } from 'lucide-react'
 import type { AppTab, CellValue, DataRow, PersistedTracker, SchoolSelectionState, SelectionResult, WorkbookModel } from './types'
 import {
@@ -25,6 +25,8 @@ import { SchoolPage } from './components/workbench/SchoolPage'
 import { DocumentsPage } from './components/workbench/DocumentsPage'
 import { AddProgramsDialog } from './components/workbench/AddProgramsDialog'
 import { appendPrograms, type ProgramImportPreview } from './lib/programImport'
+import { isStarterWorkbook } from './lib/starterWorkbook'
+import { currentAccountGuard } from './lib/accountSession'
 import { DatasetUpgradeStrip, WarningStrip, FacultyExplorer, FacultyDrawer, ChecklistPage, UpgradeBackup, DataCenter } from './components/TrackerViews'
 import './components/workbench/workbench.css'
 
@@ -37,6 +39,7 @@ function readCompareIds(): string[] {
   try { const ids: unknown = JSON.parse(localStorage.getItem('easier-comparison-v1') ?? '[]'); return Array.isArray(ids) ? [...new Set(ids.filter((id): id is string => typeof id === 'string'))].slice(0, 4) : [] } catch { return [] }
 }
 function isUpdatedDefaultDataset(model: WorkbookModel) {
+  if (isStarterWorkbook(model)) return true
   if (model.workbook.Sheets['Easier Template']?.A2?.v === 'easier-demo-v1') return model.programs.length > 0 && model.checklist.length === model.programs.length
   return model.workbook.Sheets['Program Catalog Guide']?.A2?.v === 'program-catalog-v2'
     && model.workbook.Sheets['Admissions Audit Guide']?.A2?.v === 'admissions-audit-2026-10-02'
@@ -52,6 +55,7 @@ function valueAsDate(value: CellValue): Date | null {
 }
 
 function App() {
+  const accountGuard = useRef(currentAccountGuard()).current
   const applicationNotes = useApplicationNotes()
   const workspace = useWorkspaceTabs()
   const tab = workspace.active.tab
@@ -89,31 +93,40 @@ function App() {
     else setToast('最多同時比較 4 個學程，請先移除一個。')
   }
 
-  async function loadDefaultWorkbook() {
+  const loadDefaultWorkbook = useCallback(async (existing?: WorkbookModel) => {
+    accountGuard?.assert()
     const buffer = await fetchDefaultWorkbook()
+    accountGuard?.assert()
     const model = parseWorkbook(buffer)
     if (!isUpdatedDefaultDataset(model)) {
       throw new Error('新版學程資料驗證失敗，請檢查 Programs、Application Checklist 與 Program Catalog Guide。')
     }
+    if (existing?.programs.length && !isStarterWorkbook(existing) && isStarterWorkbook(model)) {
+      throw new Error('雲端原始資料目前不存在，已保留你的現有資料。請確認原始備份後再重試。')
+    }
     setSource({ base64: arrayBufferToBase64(buffer), fileName: DEFAULT_FILE_NAME })
     setEdits([])
     setSchoolSelection(createInitialSchoolSelection(model))
-  }
+  }, [accountGuard])
 
   useEffect(() => {
     let cancelled = false
     async function initialize() {
       try {
+        accountGuard?.assert()
         const saved = localStorage.getItem(STORAGE_KEY)
         if (saved) {
           const parsed = JSON.parse(saved) as PersistedTracker
           if (parsed.version === 1 && parsed.sourceBase64) {
             const model = parseWorkbook(base64ToArrayBuffer(parsed.sourceBase64), parsed.edits ?? [])
+            if (!model.programs.length && !isStarterWorkbook(model)) throw new Error('儲存的工作區缺少學程資料，請載入有效備份。')
             if (LEGACY_DEFAULT_FILES.includes(parsed.fileName) && !model.programs.some(row => getValue(row, 'Data Origin') === '使用者新增')) {
               try {
               const buffer = await fetchDefaultWorkbook()
+              accountGuard?.assert()
               const next = parseWorkbook(buffer)
               if (!isUpdatedDefaultDataset(next)) throw new Error('update_info.xlsx 資料結構驗證失敗')
+              if (model.programs.length && isStarterWorkbook(next)) throw new Error('沒有可用的新版原始資料，保留現有工作區。')
               const migration = migrateWorkbookEdits(model, next, parsed.edits ?? [])
               // Persist a recoverable snapshot before touching the working copy.
               localStorage.setItem(PRE_UPDATE_BACKUP_KEY, saved)
@@ -136,6 +149,7 @@ function App() {
             }
             return
           }
+          throw new Error('儲存的工作區格式不正確，已保留原資料，請載入有效備份。')
         }
         await loadDefaultWorkbook()
       } catch (error) {
@@ -148,7 +162,7 @@ function App() {
     return () => {
       cancelled = true
     }
-  }, [])
+  }, [accountGuard, loadDefaultWorkbook])
 
   const baseParsed = useMemo(() => {
     if (!source) return { model: null as WorkbookModel | null, error: '' }
@@ -345,9 +359,11 @@ function App() {
       return
     }
     try {
+      accountGuard?.assert()
       const buffer = await file.arrayBuffer()
+      accountGuard?.assert()
       const model = parseWorkbook(buffer)
-      if (!model.programs.length) throw new Error('Excel 缺少可讀取的 Programs 資料')
+      if (!model.programs.length && !isStarterWorkbook(model)) throw new Error('Excel 缺少可讀取的 Programs 資料')
       setLoadError('')
       setSource({ base64: arrayBufferToBase64(buffer), fileName: file.name })
       setEdits([])
@@ -362,9 +378,12 @@ function App() {
 
   async function handleJsonImport(file: File) {
     try {
+      accountGuard?.assert()
       const backup = JSON.parse(await file.text()) as PersistedTracker
+      accountGuard?.assert()
       if (backup.version !== 1 || !backup.sourceBase64 || !Array.isArray(backup.edits)) throw new Error('備份格式不正確')
       const model = parseWorkbook(base64ToArrayBuffer(backup.sourceBase64), backup.edits)
+      if (!model.programs.length && !isStarterWorkbook(model)) throw new Error('備份缺少學程資料或有效的空白工作區範本。')
       setSource({ base64: backup.sourceBase64, fileName: backup.fileName || DEFAULT_FILE_NAME })
       setEdits(backup.edits)
       setSchoolSelection(reconcileSchoolSelection(model, backup.schoolSelection))
@@ -377,8 +396,7 @@ function App() {
   async function resetToOriginal() {
     if (!window.confirm('確定要清除自行新增的學程與所有網頁修改，重新載入原始 Excel 嗎？請先下載備份，此動作無法復原。')) return
     try {
-      localStorage.removeItem(STORAGE_KEY)
-      await loadDefaultWorkbook()
+      await loadDefaultWorkbook(parsed.model ?? undefined)
       workspace.open('data')
       setSelectedFacultyId(null)
       setToast('已重設為原始 Excel。')
@@ -389,10 +407,13 @@ function App() {
 
   async function reloadUpdatedDefaultWorkbook() {
     try {
+      accountGuard?.assert()
       if (!source || !parsed.model) return
       const buffer = await fetchDefaultWorkbook()
+      accountGuard?.assert()
       const next = parseWorkbook(buffer)
       if (!isUpdatedDefaultDataset(next)) throw new Error('新版資料結構驗證失敗')
+      if (parsed.model.programs.length && isStarterWorkbook(next)) throw new Error('沒有可用的新版原始資料，已保留現有工作區。')
       const migration = migrateWorkbookEdits(parsed.model, next, edits)
       localStorage.setItem(PRE_UPDATE_BACKUP_KEY, JSON.stringify({ version: 1, fileName: source.fileName, sourceBase64: source.base64, edits, schoolSelection, savedAt: new Date().toISOString() }))
       setSource({ base64: arrayBufferToBase64(buffer), fileName: DEFAULT_FILE_NAME })
@@ -423,7 +444,7 @@ function App() {
         return <>
       {!isUpdatedDefaultDataset(model) && !model.programs.some(row => getValue(row, 'Data Origin') === '使用者新增') && <div className="wb-legacy"><DatasetUpgradeStrip onReload={() => void reloadUpdatedDefaultWorkbook()} /></div>}
       {page.noteId ? <NoteEditor notes={applicationNotes} noteId={page.noteId} /> : selectedProgram ? <SchoolPage key={selectedProgram.id} program={selectedProgram} programs={programs} selection={schoolSelection} onAssign={assignResult} onOpenProgram={openSchool} model={model} library={library} notes={applicationNotes} comparing={validCompareIds.includes(selectedProgram.id)} onToggleCompare={() => toggleCompare(selectedProgram.id)} onBack={() => navigate(tab)} onEdit={editCell} onSop={() => navigate('sop-materials')} onOpenFaculty={setSelectedFacultyId} /> : <>
-        {tab === 'dashboard' && <OverviewPage programs={programs} model={model} selection={schoolSelection} library={library} onOpen={openSchool} onNavigate={navigate} />}
+        {tab === 'dashboard' && <OverviewPage programs={programs} model={model} selection={schoolSelection} library={library} onOpen={openSchool} onNavigate={navigate} onAddPrograms={() => setShowAddPrograms(true)} />}
         {tab === 'programs' && <SchoolsPage onAssign={assignResult} programs={programs} model={model} selection={schoolSelection} compareIds={validCompareIds} onToggleCompare={toggleCompare} onCompare={() => navigate('compare')} onOpen={openSchool} onEdit={editCell} onAddPrograms={() => setShowAddPrograms(true)} />}
         {tab === 'compare' && <ComparisonPage programs={programs} selection={schoolSelection} compareIds={validCompareIds} onToggle={toggleCompare} onOpen={openSchool} onBrowse={() => navigate('programs')} />}
         {tab === 'documents' && <DocumentsPage library={library} programs={programs} />}
