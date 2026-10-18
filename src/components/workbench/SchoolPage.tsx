@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { deadlineDateLabel } from '../../lib/admissions'
-import { ArrowLeft, ArrowLeftRight, ArrowUpRight, BookOpen, CalendarDays, CheckCircle2, ExternalLink, Files, Globe, GraduationCap, Link2, ListChecks, UsersRound } from 'lucide-react'
+import { ArrowLeft, ArrowLeftRight, ArrowUpRight, BookOpen, CalendarDays, CheckCircle2, ExternalLink, Files, Globe, GraduationCap, Link2, ListChecks, Pencil, UsersRound } from 'lucide-react'
 import type { ProgramView, SchoolSelectionState, SelectionResult, WorkbookModel } from '../../types'
 import type { DocumentsController } from '../../hooks/useDocuments'
 import type { ApplicationNotesController } from '../../hooks/useApplicationNotes'
@@ -13,6 +13,7 @@ import { DocumentsPage } from './DocumentsPage'
 import { DeadlineEventsPanel } from './DeadlineEventsPanel'
 import { RequirementFactsPanel } from './RequirementFactsPanel'
 import { ProgramNotesPanel } from './ProgramNotesPanel'
+import { EditProgramDialog } from './EditProgramDialog'
 import { Panel, SchoolIcon, SourceLink } from './shared'
 import { dateText, fieldText, type EditHandler } from './helpers'
 
@@ -27,13 +28,14 @@ const materialLabels: Record<string, string> = { 'Application Account': '申請�
 
 export function SchoolPage({ program, programs, selection, onAssign, onOpenProgram, model, library, notes, comparing, onToggleCompare, onBack, onEdit, onSop, onOpenFaculty }: { program: ProgramView; programs: ProgramView[]; selection: SchoolSelectionState; onAssign: (id: string, result: SelectionResult) => void; onOpenProgram: (id: string) => void; model: WorkbookModel; library: DocumentsController; notes: ApplicationNotesController; comparing: boolean; onToggleCompare: () => void; onBack: () => void; onEdit: EditHandler; onSop: () => void; onOpenFaculty: (id: string) => void }) {
   const [section, setSection] = useState('overview')
+  const [showEdit, setShowEdit] = useState(false)
   const faculty = model.faculty.filter((row) => makeProgramKey(getValue(row, 'University'), getValue(row, 'Program')) === program.id)
   const documentCount = library.documents.filter((doc) => !doc.archived && (doc.programId === program.id || doc.programId === null)).length
   const checklist = program.checklistRow
   const contact = String(getValue(program.row, 'Admissions Contact') ?? '')
   return <section className="wb-school-detail">
     <div className="wb-school-back"><button className="wb-text-button" onClick={onBack}><ArrowLeft size={14} />返回工作區</button><span className="wb-muted">學程工作區 / Fall 2027</span></div>
-    <header className="wb-school-hero"><SchoolIcon program={program} /><div><p className="wb-eyebrow">{program.degree} <span>FALL 2027</span></p><h1>{program.programName}</h1><p>{program.university}</p><p className="wb-muted">{fieldText(program.row, 'Campus')} · {fieldText(program.row, 'Delivery Mode')}</p><div className="wb-actions"><span className="wb-muted">申請階段</span><StatusSelect program={program} onEdit={onEdit} /><ResultSelect program={program} selection={selection} onAssign={onAssign} /></div></div><div className="wb-school-hero-actions"><SourceLink value={getValue(program.row, 'Official Application URL')} className="wb-button primary">前往申請</SourceLink><button className="wb-button" aria-pressed={comparing} onClick={onToggleCompare}><ArrowLeftRight size={14} />{comparing ? '已加入比較' : '加入比較'}</button></div></header>
+    <header className="wb-school-hero"><SchoolIcon program={program} /><div><p className="wb-eyebrow">{program.degree} <span>FALL 2027</span></p><h1>{program.programName}</h1><p>{program.university}</p><p className="wb-muted">{fieldText(program.row, 'Campus')} · {fieldText(program.row, 'Delivery Mode')}</p><div className="wb-actions"><span className="wb-muted">申請階段</span><StatusSelect program={program} onEdit={onEdit} /><ResultSelect program={program} selection={selection} onAssign={onAssign} /></div></div><div className="wb-school-hero-actions"><SourceLink value={getValue(program.row, 'Official Application URL')} className="wb-button primary">前往申請</SourceLink>{getValue(program.row, 'Data Origin') === '使用者新增' && <button className="wb-button" onClick={() => setShowEdit(true)}><Pencil size={14} />編輯學程資料</button>}<button className="wb-button" aria-pressed={comparing} onClick={onToggleCompare}><ArrowLeftRight size={14} />{comparing ? '已加入比較' : '加入比較'}</button></div></header>
     <nav className="wb-section-tabs" aria-label="學程資訊分類">{[{ id: 'overview', label: '學程總覽', icon: GraduationCap }, { id: 'requirements', label: '學程與要求', icon: BookOpen }, { id: 'tasks', label: '申請時程', icon: CalendarDays }, { id: 'materials', label: '材料清單', icon: ListChecks }, { id: 'documents', label: `我的文件 ${documentCount}`, icon: Files }, { id: 'faculty', label: `教授與研究 ${faculty.length}`, icon: UsersRound }].map(({ id, label, icon: Icon }) => <button key={id} aria-current={section === id ? 'page' : undefined} onClick={() => setSection(id)}><Icon size={15} />{label}</button>)}</nav>
     <ProgramNotesPanel program={program} notes={notes} />
     {section === 'overview' && <>
@@ -52,5 +54,6 @@ export function SchoolPage({ program, programs, selection, onAssign, onOpenProgr
     {section === 'materials' && <div className="wb-stack"><RequirementFactsPanel program={program} /><Panel title="我的材料準備進度" icon={<ListChecks size={17} />} action={<button className="wb-button" onClick={() => setSection('documents')}><Files size={14} />管理檔案</button>}><div className="wb-panel-body"><p className="wb-reading">{fieldText(checklist, '2027 Requirement Notes')}</p><p className="wb-input-hint">材料狀態與文件分開管理；加入檔案不會自動標記已提交。推薦信可逐封追蹤。</p>{checklist ? <div className="wb-checklist-grid">{CHECKLIST_FIELDS.filter((field) => field in checklist.values).map((field) => <label key={field}><span>{materialLabels[field] ?? field}</span><select aria-label={`${materialLabels[field] ?? field} 材料狀態`} value={String(getValue(checklist, field) ?? '')} onChange={(event) => onEdit(checklist, field, event.target.value)}>{checklistStatuses(field, String(getValue(checklist, field) ?? '')).map((status) => <option key={status} value={status}>{statusLabel(status) || '未設定'}</option>)}</select></label>)}</div> : <p className="wb-empty">資料庫尚無此學校的材料清單。</p>}</div></Panel></div>}
     {section === 'documents' && <DocumentsPage library={library} programs={programs} programId={program.id} />}
     {section === 'faculty' && <div className="wb-faculty-grid">{faculty.map((row) => <Panel key={row.__id} title={fieldText(row, 'Faculty Name')} icon={<UsersRound size={17} />} action={<button className="wb-text-button" onClick={() => onOpenFaculty(row.__id)}>完整資料<ArrowUpRight size={13} /></button>}><div className="wb-panel-body"><p className="wb-muted">{fieldText(row, 'Title')} · {fieldText(row, 'Lab')}</p><p className="wb-reading">{fieldText(row, 'Research Areas')}</p><p className="wb-reading">{fieldText(row, 'Why This Faculty Matches My Background')}</p><div className="wb-actions">{fieldText(row, 'Source URLs').split(/\s*;\s*/).filter((url) => safeWebUrl(url)).slice(0, 3).map((url, index) => <SourceLink key={url} value={url}><Link2 size={13} />{index === 0 ? '教授網頁' : '研究來源'}</SourceLink>)}</div></div></Panel>)}{!faculty.length && <p className="wb-empty">目前未收錄此學程的教授資料。</p>}</div>}
+    {showEdit && <EditProgramDialog program={program} model={model} onEdit={onEdit} onClose={() => setShowEdit(false)} />}
   </section>
 }

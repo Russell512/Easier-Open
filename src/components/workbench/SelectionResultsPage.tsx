@@ -1,7 +1,7 @@
 import { programSearchText } from '../../lib/workbook'
 import { useState } from 'react'
 import { DndContext, DragOverlay, PointerSensor, useDraggable, useDroppable, useSensor, useSensors } from '@dnd-kit/core'
-import { GripVertical, Search, ArrowUpRight, ChevronRight, Download, Share2 } from 'lucide-react'
+import { GripVertical, Search, ArrowUpRight, ChevronRight, Download, Share2, Plus } from 'lucide-react'
 import type { ProgramView, SchoolSelectionState, SelectionResult, WorkbookModel } from '../../types'
 import { SELECTION_RESULTS, selectionResult } from '../../lib/selection'
 import { PageHeading } from './shared'
@@ -33,7 +33,7 @@ function ResultColumn({ category, programs, selection, onAssign, onOpen }: { cat
   </section>
 }
 
-export function SelectionResultsPage({ programs, selection, model, onAssign, onOpen, onNotify }: { model: WorkbookModel; programs: ProgramView[]; selection: SchoolSelectionState; onAssign: Assign; onOpen: (id: string) => void; onNotify: (message: string) => void }) {
+export function SelectionResultsPage({ programs, selection, model, onAssign, onOpen, onNotify, onAddPrograms }: { model: WorkbookModel; programs: ProgramView[]; selection: SchoolSelectionState; onAssign: Assign; onOpen: (id: string) => void; onNotify: (message: string) => void; onAddPrograms: () => void }) {
   const [query, setQuery] = useState('')
   const [sharing, setSharing] = useState(false)
   const shortlistCount = shortlistPrograms(programs, selection).length
@@ -50,7 +50,7 @@ export function SelectionResultsPage({ programs, selection, model, onAssign, onO
     setAnnouncement(`${program?.university} ${program?.programName} 已移到${category}`)
   }
   return <section>
-    <PageHeading title="選校結果" actions={<><button className="wb-button" onClick={() => setSharing(true)}><Share2 size={15} />分享</button><div className="wb-shortlist-export"><button className="wb-button" disabled={!shortlistCount} title="匯出彩票、衝刺、主申、較為保險的全部學程，不受搜尋影響" onClick={() => { downloadShortlistCsv(model, programs, selection); onNotify(`已匯出 ${shortlistCount} 個學程`) }}><Download size={15} />匯出選校 CSV<span>{shortlistCount}</span></button></div></>} />
+    <PageHeading title="選校結果" actions={<><button className="wb-button primary" onClick={onAddPrograms}><Plus size={15} />新增學程</button><button className="wb-button" onClick={() => setSharing(true)}><Share2 size={15} />分享</button><div className="wb-shortlist-export"><button className="wb-button" disabled={!shortlistCount} title="匯出彩票、衝刺、主申、較為保險的全部學程，不受搜尋影響" onClick={() => { downloadShortlistCsv(model, programs, selection); onNotify(`已匯出 ${shortlistCount} 個學程`) }}><Download size={15} />匯出選校 CSV<span>{shortlistCount}</span></button></div></>} />
     {sharing && <ShareShortlistDialog programs={programs} selection={selection} onClose={() => setSharing(false)} />}
     <div className="wb-toolbar"><label className="wb-search"><Search size={16} /><input aria-label="搜尋選校結果" placeholder="搜尋學校或學程…" value={query} onChange={(event) => setQuery(event.target.value)} /></label><span className="wb-muted">{visible.filter(p => SHORTLIST_RESULTS.includes(selectionResult(selection.results?.[p.id]))).length} 個主要候選 · {query ? `搜尋符合 ${visible.length} 個` : `共 ${programs.length} 個學程`}</span></div>
     <p className="sr-only" role="status">{announcement}</p>

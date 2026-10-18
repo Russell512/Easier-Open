@@ -7,3 +7,45 @@
 .cloud-error button, .cloud-notice button { border: 1px solid #a98261; background: transparent; color: inherit; border-radius: 5px; padding: 5px 9px; cursor: pointer; }
 .cloud-error button:disabled, .cloud-notice button:disabled { opacity: .5; cursor: wait; }
 .cloud-pending-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 20px; background: #1e2229; color: #dde3ed; font: 16px system-ui; }
+
+.cloud-login-screen { min-height: 100dvh; padding: 40px 20px; background: #16181d; color: #e4e7ee; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans TC", sans-serif; }
+.cloud-login-card { width: min(440px, 100%); padding: 32px; border: 1px solid #30343e; border-radius: 20px; background: #1d2027; box-shadow: 0 20px 70px #0002; }
+.cloud-login-heading { text-align: center; }
+.cloud-login-brand { display: flex; justify-content: center; align-items: center; gap: 12px; margin-bottom: 29px; }
+.cloud-login-brand strong { color: #f3f5fa; font-size: 32px; font-weight: 650; letter-spacing: -1px; }
+.cloud-login-mark { display: grid; place-items: center; width: 44px; height: 44px; border-radius: 12px; background: #477cdf; color: #fff; font-size: 39px; font-weight: 750; font-style: italic; line-height: 1; }
+.cloud-login-heading h1 { margin: 0; font-size: 23px; font-weight: 650; letter-spacing: -.5px; }
+.cloud-login-heading p { margin: 10px 0 27px; color: #a3abba; font-size: 13px; }
+.cloud-screen .cloud-login-form { width: 100%; margin: 0; padding: 0; border: 0; border-radius: 0; background: none; }
+.cloud-oauth-buttons { display: grid; gap: 12px; }
+.cloud-oauth .cloud-provider { display: flex; justify-content: center; align-items: center; gap: 12px; width: 100%; min-height: 48px; margin: 0; padding: 11px 20px; border: 1px solid #747775; border-radius: 999px; font-size: 14px; font-weight: 600; line-height: 1.5; transition: border-color 140ms, box-shadow 140ms; }
+.cloud-oauth .cloud-provider-apple { background: #000; color: #fff; border-color: #6b707a; }
+.cloud-oauth .cloud-provider-google { background: #fff; color: #1f1f1f; }
+.cloud-oauth .cloud-provider:hover:not(:disabled) { box-shadow: 0 0 0 3px #9ba6bb20; border-color: #bec7d6; }
+.cloud-oauth .cloud-provider:disabled { opacity: .55; cursor: not-allowed; }
+.cloud-oauth .cloud-provider svg { display: block; width: 20px; height: 20px; flex-shrink: 0; }
+.cloud-oauth .cloud-provider-hint { min-height: 20px; margin: 9px 0 0; color: #a3abba; text-align: center; font-size: 12px; line-height: 20px; }
+.cloud-login-form .cloud-login-divider { display: flex; align-items: center; gap: 14px; margin: 17px 0 23px; color: #a3abba; font-size: 12px; }
+.cloud-login-divider::before, .cloud-login-divider::after { content: ""; flex: 1; height: 1px; background: #383e49; }
+.cloud-login-form label { margin-top: 17px; font-size: 13px; font-weight: 550; color: #d5dbe5; }
+.cloud-login-form input { margin-top: 8px; min-height: 48px; padding: 11px 14px; border: 1px solid #48505f; border-radius: 9px; background: #16181d; color: #f3f5fa; font-size: 16px; font-weight: 400; }
+.cloud-login-form input::placeholder { color: #7e889a; }
+.cloud-login-form input:focus-visible, .cloud-login-screen button:focus-visible, .cloud-login-screen a:focus-visible, .cloud-provider:focus-visible { outline: 2px solid #88b3ff; outline-offset: 3px; }
+.cloud-login-form .cloud-email-submit { min-height: 48px; margin-top: 24px; border-radius: 999px; background: #477cdf; color: #fff; font-size: 14px; }
+.cloud-login-form .cloud-email-submit:hover:not(:disabled) { background: #5489ec; }
+.cloud-login-form .cloud-login-error { margin: 16px 0 0; padding: 10px 13px; border: 1px solid #864e51; border-radius: 8px; background: #43292f; color: #ffc4bc; font-size: 13px; overflow-wrap: anywhere; }
+.cloud-login-footer { margin-top: 24px; text-align: center; }
+.cloud-login-footer a { color: #a3abba; font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
+.cloud-login-footer a:hover { color: #d9e5fb; }
+.cloud-oauth-compact { max-width: 420px; }
+.cloud-oauth-compact .cloud-oauth-buttons { display: flex; flex-wrap: wrap; gap: 8px; }
+.cloud-oauth-compact .cloud-provider { width: auto; flex: 1; min-height: 40px; padding: 8px 14px; white-space: nowrap; font-size: 12px; }
+.cloud-share-login { width: min(340px, 100%); margin: 0 auto; }
+.cloud-share-login > p { margin-bottom: 24px; }
+@media (max-width: 480px) {
+  .cloud-login-screen { padding: 24px 16px; }
+  .cloud-login-card { padding: 28px 22px; border-radius: 16px; }
+  .cloud-login-heading p { font-size: 12px; }
+  .cloud-oauth-compact .cloud-provider { font-size: 11px; gap: 8px; padding: 8px 11px; }
+}
+@media (prefers-reduced-motion: reduce) { .cloud-oauth .cloud-provider { transition: none; } }

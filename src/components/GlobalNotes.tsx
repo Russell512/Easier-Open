@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowRight, Check, CheckCircle2, Circle, NotebookPen, Plus, X } from 'lucide-react'
 import type { ApplicationNotesController } from '../hooks/useApplicationNotes'
+import { MarkdownNoteEditor } from './MarkdownNoteEditor'
 
 function noteLabel(title: string) {
   return title.trim() || '未命名筆記'
@@ -16,13 +17,7 @@ export function GlobalNotes({
   hidden?: boolean
 }) {
   const [open, setOpen] = useState(false)
-  const textareaRef = useRef<HTMLTextAreaElement>(null)
   const selected = notes.selectedNote
-
-  useEffect(() => {
-    if (!open) return
-    textareaRef.current?.focus()
-  }, [open, selected?.id])
 
   useEffect(() => {
     function closeOnEscape(event: KeyboardEvent) {
@@ -90,14 +85,16 @@ export function GlobalNotes({
                 aria-label="Note 標題"
                 className="w-full border-0 bg-transparent px-1 text-base font-bold text-stone-900 outline-none placeholder:text-stone-300"
               />
-              <textarea
-                ref={textareaRef}
+              <div className="mt-3"><MarkdownNoteEditor
+                key={selected.id}
+                compact
+                autoFocus
                 value={selected.body}
-                onChange={(event) => notes.updateNote(selected.id, { body: event.target.value })}
+                onChange={(body) => notes.updateNote(selected.id, { body })}
+                title={selected.title}
+                checklist={selected.checklist}
                 placeholder="記下 program 資訊、比較結果或想法…"
-                aria-label="Note 內容"
-                className="mt-2 min-h-44 w-full resize-y rounded-2xl border border-stone-200 bg-stone-50 p-3.5 text-sm leading-6 text-stone-800 outline-none placeholder:text-stone-400 focus:border-emerald-400 focus:bg-white"
-              />
+              /></div>
 
               <div className="mt-3 space-y-1.5">
                 {selected.checklist.map((item) => (

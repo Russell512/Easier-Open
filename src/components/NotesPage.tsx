@@ -12,6 +12,7 @@ import { dragPage } from '../lib/pageDrag'
 import { workspacePage } from '../lib/workspaceTabs'
 import type { ApplicationNote } from '../lib/notes'
 import type { ApplicationNotesController } from '../hooks/useApplicationNotes'
+import { MarkdownNoteEditor } from './MarkdownNoteEditor'
 
 function noteTitle(note: ApplicationNote) {
   return note.title.trim() || '未命名筆記'
@@ -54,7 +55,7 @@ export function NoteEditor({ notes, noteId }: { notes: ApplicationNotesControlle
                   onChange={(event) => notes.updateNote(selected.id, { title: event.target.value })}
                   placeholder="未命名筆記"
                   aria-label="Note 標題"
-                  className="min-w-0 flex-1 bg-transparent text-xl font-bold tracking-tight text-stone-900 outline-none placeholder:text-stone-300 sm:text-2xl"
+                  className="wb-note-title min-w-0 flex-1 bg-transparent text-xl font-bold tracking-tight text-stone-900 outline-none placeholder:text-stone-300 sm:text-2xl"
                 />
                 <button
                   onClick={deleteSelected}
@@ -67,13 +68,12 @@ export function NoteEditor({ notes, noteId }: { notes: ApplicationNotesControlle
               </header>
 
               <div className="flex-1 p-5 sm:p-7">
-                <textarea
+                <MarkdownNoteEditor
+                  key={selected.id}
                   value={selected.body}
-                  onChange={(event) => notes.updateNote(selected.id, { body: event.target.value })}
-                  placeholder="寫下筆記…"
-                  aria-label="Note 內容"
-                  className="min-h-72 w-full resize-y border-0 bg-transparent text-sm leading-7 text-stone-800 outline-none placeholder:text-stone-300 sm:text-[15px]"
-                  data-testid="note-body-editor"
+                  onChange={(body) => notes.updateNote(selected.id, { body })}
+                  title={selected.title}
+                  checklist={selected.checklist}
                 />
 
                 <section className="mt-6 border-t border-stone-100 pt-5">

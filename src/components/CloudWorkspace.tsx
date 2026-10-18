@@ -4,9 +4,10 @@ import { cloud, LOCAL_MODE, LOCAL_CHANGE_EVENT } from '../lib/cloudClient'
 import { addExcelExport, applySnapshot, captureSnapshot, downloadCloudExcel, exportFullBackup, importFullBackup, needsConflictResolution, pushCloud, readBaseline, readCloud, snapshotSignature, writeBaseline, type Baseline } from '../lib/cloudSnapshot'
 import { STORAGE_KEY } from '../lib/workbook'
 import { createSyncQueue } from '../lib/syncQueue'
-import { signInWithGoogle } from '../lib/googleAuth'
+import { oauthCallbackError, signInWithProvider, type OAuthProvider } from '../lib/oauthAuth'
 import { WorkspaceAccountContext, type WorkspaceAccount } from '../lib/workspaceAccount'
 import { AccountMenu } from './AccountMenu'
+import { OAuthButtons } from './OAuthButtons'
 import './cloud.css'
 
 export function CloudWorkspace({ children }: { children: ReactNode }) {
@@ -17,7 +18,7 @@ export function CloudWorkspace({ children }: { children: ReactNode }) {
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
   const [status, setStatus] = useState('正在讀取雲端資料…')
-  const [error, setError] = useState('')
+  const [error, setError] = useState(() => oauthCallbackError(window.location))
   const [conflict, setConflict] = useState(false)
   const [remoteChanged, setRemoteChanged] = useState(false)
   const baseline = useRef<Baseline | null>(null)
@@ -214,6 +215,12 @@ export function CloudWorkspace({ children }: { children: ReactNode }) {
     catch (reason) { setError(reason instanceof Error ? reason.message : '登入失敗') }
     finally { setBusy(false) }
   }
+  async function signInWithOAuth(provider: OAuthProvider) {
+    setBusy(true); setError('')
+    try { await signInWithProvider(provider) }
+    catch (reason) { setError(reason instanceof Error ? reason.message : '登入失敗') }
+    finally { setBusy(false) }
+  }
   async function run(action: () => Promise<void>) { setError(''); try { await action() } catch (reason) { setError(reason instanceof Error ? reason.message : '操作失敗') } }
 
   const account: WorkspaceAccount = {
@@ -238,7 +245,20 @@ export function CloudWorkspace({ children }: { children: ReactNode }) {
     return <WorkspaceAccountContext.Provider value={account}><div className="cloud-workspace">{error && <div className="cloud-error" role="alert">{error}</div>}{backupChooser}<div className="cloud-workspace-content" inert={busy}>{children}</div></div></WorkspaceAccountContext.Provider>
   }
   if (!authReady) return <div className="cloud-screen">正在確認登入狀態…</div>
-  if (!session) return <main className="cloud-screen"><form onSubmit={(event) => void signIn(event)}><p className="cloud-brand">EASIER</p><h1>登入工作區</h1><button type="button" className="cloud-google" disabled={busy} onClick={() => { setBusy(true); void run(signInWithGoogle).finally(() => setBusy(false)) }}>使用 Google 帳號登入</button><div className="cloud-login-divider">或使用 Email</div><label>Email<input type="email" autoComplete="username" required value={email} onChange={(event) => setEmail(event.target.value)} /></label><label>密碼<input type="password" autoComplete="current-password" required value={password} onChange={(event) => setPassword(event.target.value)} /></label><button disabled={busy} type="submit">{busy ? '正在登入…' : '登入工作區'}</button>{error && <p role="alert">{error}</p>}<a href="/privacy.html">隱私權說明</a></form></main>
+  if (!session) return <main className="cloud-screen cloud-login-screen">
+    <section className="cloud-login-card" aria-labelledby="cloud-login-title">
+      <header className="cloud-login-heading"><div className="cloud-login-brand"><span className="cloud-login-mark" aria-hidden="true">e</span><strong>Easier</strong></div><h1 id="cloud-login-title">登入你的工作區</h1><p>學程、筆記與申請進度，接著上次的步調。</p></header>
+      <form className="cloud-login-form" onSubmit={(event) => void signIn(event)} aria-busy={busy}>
+        <OAuthButtons busy={busy} onSignIn={provider => void signInWithOAuth(provider)} />
+        <div className="cloud-login-divider"><span>或使用 Email 登入</span></div>
+        <label htmlFor="cloud-email">Email<input id="cloud-email" type="email" autoComplete="username" autoCapitalize="none" spellCheck={false} placeholder="you@example.com" required disabled={busy} value={email} onChange={(event) => setEmail(event.target.value)} /></label>
+        <label htmlFor="cloud-password">密碼<input id="cloud-password" type="password" autoComplete="current-password" placeholder="輸入你的密碼" required disabled={busy} value={password} onChange={(event) => setPassword(event.target.value)} /></label>
+        <button className="cloud-email-submit" disabled={busy} type="submit">{busy ? '正在登入…' : '登入工作區'}</button>
+        {error && <p className="cloud-login-error" role="alert">{error}</p>}
+      </form>
+      <footer className="cloud-login-footer"><a href="/privacy.html">隱私權說明</a></footer>
+    </section>
+  </main>
   if (!access || access.userId !== uid) return <main className="cloud-screen"><h1>{error ? '無法確認權限' : '正在確認權限…'}</h1>{error && <><p role="alert">{error}</p><button onClick={() => window.location.reload()}>重試</button></>}<button onClick={() => void cloud!.auth.signOut()}>登出</button></main>
   if (!canEdit) return <main className="cloud-screen"><div className="cloud-viewer"><p className="cloud-brand">EASIER · 唯讀帳號</p><h1>請使用分享連結</h1><p>此帳號沒有編輯權限。透過擁有者提供的連結，可以查看已分享的選校結果。</p><p>{session.user.email}</p><button onClick={() => void cloud!.auth.signOut()}>登出並切換帳號</button></div></main>
   return <WorkspaceAccountContext.Provider value={account}><div className="cloud-workspace">

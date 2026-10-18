@@ -15,9 +15,11 @@ Easier 是免費、開源的學程研究與申請管理工具：整理選校結�
 ## 可以做什麼？
 
 - **以學程為單位研究**：同一所學校的 MSCS、MCS 或其他學位分開管理；查看要求、時程、研究線索與官方連結。
+- **從網頁新增學程**：按「新增學程」，填學校與學程名稱就能開始。也可下載 CSV 範本／目前清單及 AI 提示詞，再上傳或貼上 CSV 檢查；預覽會列出錯誤與重複資料。每次最多 500 列、5 MB，只加入新學程，原有進度和筆記保留。新增資料標為待核實，附全新的材料清單，之後可在學程頁「編輯學程資料」補填。
 - **清楚的選校結果**：彩票、衝刺、主申、較為保險分成四個向下排列的區域，卡片依可用寬度排列。頁面上方的「匯出選校 CSV」只包含這四類中的全部學程，不受搜尋影響；分類置前，保留目前修改的學程資料。未分類與淘汰預設收合，展開後仍可搜尋、重新分類。
 - **最多四欄並排**：拖曳頂部分頁或筆記到內容的左／右側，或用「並排開啟」選單。每欄獨立捲動；三點分隔線可拖曳調寬，雙擊平分，方向鍵微調。右上角 × 關閉後，其他欄位按比例填補空間。
 - **Notes 側欄**：像筆記 App 一樣集中查看、搜尋、新增筆記。點選在右側開啟；可同時編輯不同筆記，每篇包含文字與 checklist。學程專屬筆記也會出現在清單。
+- **Markdown 編輯器**：工具列支援粗體、螢光標記、超連結及清單，提供編輯／並排／預覽與一鍵複製完整 Markdown，包含標題和 checklist。
 - **材料與文件**：追蹤 CV、SOP、成績單、考試、推薦信；保留文件版本及適用學程。加入文件不代表已提交申請。
 - **Excel 與備份**：匯入／匯出 `.xlsx`、匯出學程 `.csv`，完整備份包含筆記與文件。
 - **帳號選單與頭像**：點右上角頭像開啟設定，上傳照片或使用 Google 頭像。同步、完整備份、匯入、雲端 Excel、修改密碼與登出集中於此；同步狀態顯示在底部。
@@ -39,7 +41,7 @@ npm run dev
 1. 從「選校結果」試著拖拉示範卡片，或使用卡片上的選單。
 2. 按側欄 Notes 的 `+`，在右側記錄想法。
 3. 用「並排開啟」加一個學程，拖動分隔線，試試 2–4 欄。
-4. 到「資料與備份」匯出 Excel，改成自己的學程後再匯入。
+4. 在「所有學程 → 新增學程」手動填寫，或使用 CSV 範本與 AI 提示詞批次整理。
 
 本 repo 附 **6 個虛構學程**，不是經過查證的招生清單。截止日、考試要求與費用刻意不填猜測值。請填入各學程官方來源與查核日期。沒有任何人的選校評分、私人筆記、履歷或帳號金鑰。
 
@@ -95,6 +97,8 @@ npm run preview
 
 ### Google 登入與唯讀分享
 
+登入頁含 Easier 標誌、Google／Apple 圖示及 Email 表單。Apple 網頁登入的 Developer 帳號、Services ID、callback 和憑證設定請見 [Apple 登入設定](docs/apple-sign-in.md)。未啟用時按鈕會說明狀態；完成 Supabase 設定後重新載入即可使用。
+
 依 [Supabase Google 登入文件](https://supabase.com/docs/guides/auth/social-login/auth-google)，在 Google Auth Platform 建立 Web OAuth 用戶端，將 Supabase 的 `/auth/v1/callback` 加到 Authorized redirect URIs，再把 Client ID / Secret 填入 Supabase 的 Google provider。Secret 只放在 Supabase，不可放進 `VITE_*`。在 Supabase URL Configuration 設定網站網址與允許的回跳網址。同一個已驗證 Email 的 Google 身分會連接到原有帳號；編輯權限依資料庫的使用者 UUID 判斷。
 
 Google 品牌設定需填寫實際網站首頁與隱私權說明。部署前請按你的服務設定修改 `public/privacy.html` 與聯絡方式，並在 Google Auth Platform 將目標對象設為正式發布。只需基本 `openid`、Email 與個人資料範圍，無須 Gmail 或 Drive 權限。Supabase Redirect URLs 可使用你的正式網站 `https://你的網域/**`，讓登入後保留分享連結；不要允許不受你控制的網域。
@@ -112,6 +116,8 @@ npm run test:tabs
 npm run test:shortlist
 npm run test:sharing
 npm run test:notes
+npm run test:program-import
+npm run test:auth
 npm run test:documents
 npm run test:autosync
 npm run test:demo

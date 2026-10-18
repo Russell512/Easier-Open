@@ -23,14 +23,16 @@ import { SchoolsPage, ComparisonPage } from './components/workbench/SchoolsPage'
 import { SelectionResultsPage } from './components/workbench/SelectionResultsPage'
 import { SchoolPage } from './components/workbench/SchoolPage'
 import { DocumentsPage } from './components/workbench/DocumentsPage'
+import { AddProgramsDialog } from './components/workbench/AddProgramsDialog'
+import { appendPrograms, type ProgramImportPreview } from './lib/programImport'
 import { DatasetUpgradeStrip, WarningStrip, FacultyExplorer, FacultyDrawer, ChecklistPage, UpgradeBackup, DataCenter } from './components/TrackerViews'
 import './components/workbench/workbench.css'
 
 type EditHandler = (row: DataRow, field: string, value: CellValue) => void
-const commandNavigationItems: CommandItem[] = WORKSPACE_NAV.map((item) => ({
-  id: 'nav:' + item.id, kind: 'navigation', title: item.label, subtitle: '前往' + item.label,
+const commandNavigationItems: CommandItem[] = [...WORKSPACE_NAV.map((item) => ({
+  id: 'nav:' + item.id, kind: 'navigation' as const, title: item.label, subtitle: '前往' + item.label,
   searchText: item.id, featured: true, target: { tab: item.id },
-}))
+})), { id: 'action:add-program', kind: 'navigation', title: '新增學程', subtitle: '手動新增或匯入 CSV', searchText: '新增 program add import csv AI', featured: true, target: { tab: 'programs' } }]
 function readCompareIds(): string[] {
   try { const ids: unknown = JSON.parse(localStorage.getItem('easier-comparison-v1') ?? '[]'); return Array.isArray(ids) ? [...new Set(ids.filter((id): id is string => typeof id === 'string'))].slice(0, 4) : [] } catch { return [] }
 }
@@ -68,6 +70,7 @@ function App() {
   const library = useDocuments()
   const [saveError, setSaveError] = useState(false)
   const [showHelp, setShowHelp] = useState(false)
+  const [showAddPrograms, setShowAddPrograms] = useState(false)
   const [compareIds, setCompareIds] = useState<string[]>(readCompareIds)
   useEffect(() => {
     try { saveLocalValue('easier-comparison-v1', JSON.stringify(compareIds)) } catch { setToast('比較清單尚未儲存，請先備份資料。') }
@@ -106,7 +109,7 @@ function App() {
           const parsed = JSON.parse(saved) as PersistedTracker
           if (parsed.version === 1 && parsed.sourceBase64) {
             const model = parseWorkbook(base64ToArrayBuffer(parsed.sourceBase64), parsed.edits ?? [])
-            if (LEGACY_DEFAULT_FILES.includes(parsed.fileName)) {
+            if (LEGACY_DEFAULT_FILES.includes(parsed.fileName) && !model.programs.some(row => getValue(row, 'Data Origin') === '使用者新增')) {
               try {
               const buffer = await fetchDefaultWorkbook()
               const next = parseWorkbook(buffer)
@@ -196,6 +199,7 @@ function App() {
 
   useEffect(() => {
     function handleShortcut(event: KeyboardEvent) {
+      if (event.defaultPrevented || showAddPrograms) return
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault()
         setShowCommandPalette((open) => !open)
@@ -206,7 +210,7 @@ function App() {
     }
     window.addEventListener('keydown', handleShortcut)
     return () => window.removeEventListener('keydown', handleShortcut)
-  }, [])
+  }, [showAddPrograms])
 
   const programs = useMemo(() => (parsed.model ? buildProgramViews(parsed.model) : []), [parsed.model])
   const reconcileTabs = workspace.reconcile
@@ -285,9 +289,30 @@ function App() {
   const selectedFaculty = parsed.model?.faculty.find((row) => row.__id === selectedFacultyId) ?? null
 
   function handleCommandSelect(item: CommandItem) {
+    if (item.id === 'action:add-program') { setShowAddPrograms(true); return }
     navigate(item.target.tab, item.target.programId ?? null)
     setSelectedFacultyId(item.target.facultyId ?? null)
     if (item.target.checklistProgramId) setChecklistProgramId(item.target.checklistProgramId)
+  }
+
+  async function handleAddPrograms(preview: ProgramImportPreview) {
+    if (!source || !parsed.model || !schoolSelection) throw new Error('工作區尚未準備好，請稍後重試。')
+    const added = appendPrograms(parsed.model, preview)
+    if (!added.addedIds.length) throw new Error('沒有可新增的學程；已有的學程會自動略過。')
+    const nextSelection = reconcileSchoolSelection(added.model, schoolSelection)
+    const nextSource = { base64: arrayBufferToBase64(added.buffer), fileName: LEGACY_DEFAULT_FILES.includes(source.fileName) ? 'Easier_workspace.xlsx' : source.fileName }
+    const next: PersistedTracker = { version: 1, fileName: nextSource.fileName, sourceBase64: nextSource.base64, edits: [], schoolSelection: nextSelection, savedAt: new Date().toISOString() }
+    // Save the complete merged workbook before changing the visible state. A quota
+    // error leaves both the old workspace and the import preview available.
+    saveLocalValue(STORAGE_KEY, JSON.stringify(next))
+    setSource(nextSource)
+    setEdits([])
+    setSchoolSelection(nextSelection)
+    setSaveError(false)
+    setShowAddPrograms(false)
+    setToast(`已新增 ${added.addedIds.length} 個學程，原有清單與進度已保留。`)
+    if (added.addedIds.length === 1) navigate('programs', added.addedIds[0])
+    else navigate('programs')
   }
 
   const editCell: EditHandler = (row, field, value) => {
@@ -350,7 +375,7 @@ function App() {
   }
 
   async function resetToOriginal() {
-    if (!window.confirm('確定要清除所有網頁修改，重新載入原始 Excel 嗎？此動作無法復原。')) return
+    if (!window.confirm('確定要清除自行新增的學程與所有網頁修改，重新載入原始 Excel 嗎？請先下載備份，此動作無法復原。')) return
     try {
       localStorage.removeItem(STORAGE_KEY)
       await loadDefaultWorkbook()
@@ -396,22 +421,23 @@ function App() {
         const tab = page.tab
         const selectedProgram = programs.find((program) => program.id === page.school) ?? null
         return <>
-      {!isUpdatedDefaultDataset(model) && <div className="wb-legacy"><DatasetUpgradeStrip onReload={() => void reloadUpdatedDefaultWorkbook()} /></div>}
+      {!isUpdatedDefaultDataset(model) && !model.programs.some(row => getValue(row, 'Data Origin') === '使用者新增') && <div className="wb-legacy"><DatasetUpgradeStrip onReload={() => void reloadUpdatedDefaultWorkbook()} /></div>}
       {page.noteId ? <NoteEditor notes={applicationNotes} noteId={page.noteId} /> : selectedProgram ? <SchoolPage key={selectedProgram.id} program={selectedProgram} programs={programs} selection={schoolSelection} onAssign={assignResult} onOpenProgram={openSchool} model={model} library={library} notes={applicationNotes} comparing={validCompareIds.includes(selectedProgram.id)} onToggleCompare={() => toggleCompare(selectedProgram.id)} onBack={() => navigate(tab)} onEdit={editCell} onSop={() => navigate('sop-materials')} onOpenFaculty={setSelectedFacultyId} /> : <>
         {tab === 'dashboard' && <OverviewPage programs={programs} model={model} selection={schoolSelection} library={library} onOpen={openSchool} onNavigate={navigate} />}
-        {tab === 'programs' && <SchoolsPage onAssign={assignResult} programs={programs} model={model} selection={schoolSelection} compareIds={validCompareIds} onToggleCompare={toggleCompare} onCompare={() => navigate('compare')} onOpen={openSchool} onEdit={editCell} />}
+        {tab === 'programs' && <SchoolsPage onAssign={assignResult} programs={programs} model={model} selection={schoolSelection} compareIds={validCompareIds} onToggleCompare={toggleCompare} onCompare={() => navigate('compare')} onOpen={openSchool} onEdit={editCell} onAddPrograms={() => setShowAddPrograms(true)} />}
         {tab === 'compare' && <ComparisonPage programs={programs} selection={schoolSelection} compareIds={validCompareIds} onToggle={toggleCompare} onOpen={openSchool} onBrowse={() => navigate('programs')} />}
         {tab === 'documents' && <DocumentsPage library={library} programs={programs} />}
-        {tab === 'results' && <SelectionResultsPage model={model} programs={programs} selection={schoolSelection} onAssign={assignResult} onOpen={openSchool} onNotify={setToast} />}
+        {tab === 'results' && <SelectionResultsPage model={model} programs={programs} selection={schoolSelection} onAssign={assignResult} onOpen={openSchool} onNotify={setToast} onAddPrograms={() => setShowAddPrograms(true)} />}
         {tab === 'selection' && <div className="wb-legacy"><SchoolSelectionPage model={model} programs={programs} selection={schoolSelection} onChange={setSchoolSelection} onOpenProgram={openSchool} onExport={exportExcel} /></div>}
         {tab === 'faculty' && <div className="wb-legacy"><FacultyExplorer model={model} onOpenFaculty={setSelectedFacultyId} /></div>}
         {tab === 'checklist' && <div className="wb-legacy"><ChecklistPage programs={programs} onEdit={editCell} focusProgramId={checklistProgramId} /></div>}
         {tab === 'sop-materials' && <div className="wb-legacy"><SopMaterialBankPage programs={programs} /></div>}
         {tab === 'notes' && <NotesPage notes={applicationNotes} onOpen={id => { applicationNotes.selectNote(id); workspace.openNote(id) }} />}
-        {tab === 'data' && <div className="wb-legacy"><WarningStrip warnings={model.warnings} /><UpgradeBackup /><DataCenter model={model} fileName={source.fileName} editCount={edits.length} onExcelImport={() => fileInput.current?.click()} onExportExcel={exportExcel} onExportCsv={() => downloadProgramsCsv(model.workbook, programs, schoolSelection)} onExportJson={() => downloadJsonBackup(persisted)} onImportJson={() => jsonInput.current?.click()} onReset={() => void resetToOriginal()} /><p className="wb-footnote">這裡的 JSON 備份包含學校資料、材料進度與選校排序。實際文件請到「我的文件」備份；SOP 素材可於素材頁匯出。</p></div>}
+        {tab === 'data' && <div className="wb-legacy"><WarningStrip warnings={model.warnings} /><UpgradeBackup /><DataCenter onAddPrograms={() => setShowAddPrograms(true)} model={model} fileName={source.fileName} editCount={edits.length} onExcelImport={() => fileInput.current?.click()} onExportExcel={exportExcel} onExportCsv={() => downloadProgramsCsv(model.workbook, programs, schoolSelection)} onExportJson={() => downloadJsonBackup(persisted)} onImportJson={() => jsonInput.current?.click()} onReset={() => void resetToOriginal()} /><p className="wb-footnote">這裡的 JSON 備份包含學校資料、材料進度與選校排序。實際文件請到「我的文件」備份；SOP 素材可於素材頁匯出。</p></div>}
       </>}
       </> }}
     </WorkbenchShell>
+    {showAddPrograms && <AddProgramsDialog model={model} onAdd={handleAddPrograms} onClose={() => setShowAddPrograms(false)} />}
     <input ref={fileInput} hidden type="file" accept=".xlsx" onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ''; if (file) void handleExcelImport(file) }} />
     <input ref={jsonInput} hidden type="file" accept=".json" onChange={(event) => { const file = event.target.files?.[0]; event.currentTarget.value = ''; if (file) void handleJsonImport(file) }} />
     {selectedFaculty && <div className="wb-legacy"><FacultyDrawer row={selectedFaculty} onClose={() => setSelectedFacultyId(null)} onEdit={editCell} /></div>}
