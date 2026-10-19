@@ -297,6 +297,11 @@ function answerOutput(answer: MaterialAnswer | undefined) {
   return ''
 }
 
+export function materialEntryTitle(definition: MaterialSectionDefinition, entry: MaterialEntry, index: number) {
+  const preferredField = definition.fields.find(field => ['title', 'area', 'program', 'text', 'name', 'quality'].includes(field.id))
+  return (preferredField ? entry.answers[preferredField.id]?.text.trim() : '') || `${definition.itemLabel} ${index + 1}`
+}
+
 export function getSopProgress(state: SopMaterialBankState) {
   let total = 0
   let answered = 0
@@ -396,4 +401,29 @@ export function exportSopMaterialBankTxt(state: SopMaterialBankState) {
 
   const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' })
   downloadBlob(blob, `SOP_Material_Bank_${date}.txt`)
+}
+
+export function createSopMaterialEntryTxt(definition: MaterialSectionDefinition, entry: MaterialEntry, index: number, date = new Date()) {
+  const title = materialEntryTitle(definition, entry, index)
+  const stamp = localDateStamp(date)
+  const lines = [
+    `SOP 素材｜${title}`,
+    `分類：${definition.title}（${definition.eyebrow}）`,
+    `匯出日期：${stamp}`,
+    '',
+  ]
+  definition.fields.forEach((field, fieldIndex) => {
+    const answer = entry.answers[field.id]
+    lines.push(`${fieldIndex + 1}. ${field.label}`)
+    if (answer?.status === 'later') lines.push('狀態：稍後再填')
+    if (answer?.status === 'unsure') lines.push('狀態：目前不確定')
+    lines.push('回答：', answer?.text.trim() ? answer.text : '（尚未填寫）', '')
+  })
+  const safeTitle = [...title.normalize('NFC').replace(/[^\p{L}\p{N}\p{M}\s._-]/gu, '_').replace(/\s+/g, ' ').replace(/^[ .]+|[ .]+$/g, '')].slice(0, 60).join('').trim() || definition.itemLabel
+  return { text: lines.join('\n'), fileName: `SOP_${definition.id}_${safeTitle}_${stamp}.txt` }
+}
+
+export function exportSopMaterialEntryTxt(definition: MaterialSectionDefinition, entry: MaterialEntry, index: number) {
+  const { text, fileName } = createSopMaterialEntryTxt(definition, entry, index)
+  downloadBlob(new Blob([text], { type: 'text/plain;charset=utf-8' }), fileName)
 }

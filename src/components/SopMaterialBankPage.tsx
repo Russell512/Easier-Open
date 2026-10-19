@@ -45,7 +45,9 @@ import {
   createInitialSopMaterialBank,
   createMaterialEntry,
   exportSopMaterialBankTxt,
+  exportSopMaterialEntryTxt,
   getSopProgress,
+  materialEntryTitle as itemSummary,
   reconcileSopMaterialBank,
   type AnswerStatus,
   type MaterialAnswer,
@@ -67,13 +69,6 @@ function loadMaterialBank() {
   } catch {
     return createInitialSopMaterialBank()
   }
-}
-
-function itemSummary(definition: MaterialSectionDefinition, entry: MaterialEntry, index: number) {
-  const preferredField = definition.fields.find((field) =>
-    ['title', 'area', 'program', 'text', 'name', 'quality'].includes(field.id))
-  const value = preferredField ? entry.answers[preferredField.id]?.text.trim() : ''
-  return value || `${definition.itemLabel} ${index + 1}`
 }
 
 function answerStateTone(answer: MaterialAnswer | undefined) {
@@ -413,6 +408,14 @@ export function SopMaterialBankPage({ programs }: { programs: ProgramView[] }) {
             onToggle={() => toggleSection(definition.id)}
             onAdd={() => addEntry(definition)}
             onDelete={(entry, index) => deleteEntry(definition, entry, index)}
+            onExport={(entry, index) => {
+              try {
+                exportSopMaterialEntryTxt(definition, entry, index)
+                setMessage('這份素材的問題與回答已匯出 TXT。')
+              } catch {
+                setMessage('TXT 匯出失敗，請再試一次。')
+              }
+            }}
             onUpdate={(entryId, fieldId, update) => updateAnswer(definition.id, entryId, fieldId, update)}
             onDragStart={(event) => handleDragStart(definition, event)}
             onDragEnd={(event) => handleDragEnd(definition, event)}
@@ -455,6 +458,7 @@ function MaterialSectionCard({
   onToggle,
   onAdd,
   onDelete,
+  onExport,
   onUpdate,
   onDragStart,
   onDragEnd,
@@ -473,6 +477,7 @@ function MaterialSectionCard({
   onToggle: () => void
   onAdd: () => void
   onDelete: (entry: MaterialEntry, index: number) => void
+  onExport: (entry: MaterialEntry, index: number) => void
   onUpdate: (entryId: string, fieldId: string, update: Partial<MaterialAnswer>) => void
   onDragStart: (event: DragStartEvent) => void
   onDragEnd: (event: DragEndEvent) => void
@@ -566,6 +571,7 @@ function MaterialSectionCard({
                     canDelete={definition.repeatable && entries.length > 1}
                     programSuggestions={programSuggestions}
                     onDelete={() => onDelete(entry, index)}
+                    onExport={() => onExport(entry, index)}
                     onUpdate={(fieldId, update) => onUpdate(entry.id, fieldId, update)}
                   />
                 ))}
@@ -599,6 +605,7 @@ function SortableMaterialEntry({
   canDelete,
   programSuggestions,
   onDelete,
+  onExport,
   onUpdate,
 }: {
   definition: MaterialSectionDefinition
@@ -609,6 +616,7 @@ function SortableMaterialEntry({
   canDelete: boolean
   programSuggestions: string[]
   onDelete: () => void
+  onExport: () => void
   onUpdate: (fieldId: string, update: Partial<MaterialAnswer>) => void
 }) {
   const contentId = useId()
@@ -632,7 +640,7 @@ function SortableMaterialEntry({
       )}
       data-testid={`sop-entry-${definition.id}-${index}`}
     >
-      <div className={classNames('flex items-center gap-3 bg-white px-3 py-3 sm:px-4', expanded && 'border-b border-stone-100')}>
+      <div className={classNames('flex items-center gap-1 bg-white px-3 py-3 sm:gap-3 sm:px-4', expanded && 'border-b border-stone-100')}>
         {definition.repeatable && (
           <button
             type="button"
@@ -657,9 +665,18 @@ function SortableMaterialEntry({
             <span className="mt-0.5 block text-[10px] text-stone-400">{completed} / {definition.fields.length} 項已填寫 · {addressed} 項已檢視</span>
           </span>
           <span className="inline-flex shrink-0 items-center gap-1 text-xs font-semibold text-stone-500">
-            {expanded ? '收合' : '展開'}
+            <span className="hidden sm:inline">{expanded ? '收合' : '展開'}</span>
             <ChevronDown className={classNames('h-4 w-4 transition-transform', expanded && 'rotate-180')} />
           </span>
+        </button>
+        <button
+          type="button"
+          onClick={onExport}
+          aria-label={`匯出 ${itemSummary(definition, entry, index)} 的問題與回答為 TXT`}
+          title="匯出這份素材的全部問題與回答（TXT）"
+          className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-stone-200 px-2 py-2 text-[11px] font-bold text-stone-600 hover:border-emerald-300 hover:bg-emerald-50 hover:text-emerald-700"
+        >
+          <Download className="h-4 w-4" /><span className="hidden sm:inline">匯出</span> TXT
         </button>
         {canDelete && (
           <button
